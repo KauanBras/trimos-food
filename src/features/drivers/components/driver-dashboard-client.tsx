@@ -34,6 +34,7 @@ type DriverDelivery = {
   id: string;
   order_id: string;
   driver_id: string | null;
+  offered_driver_id: string | null;
   status: DeliveryStatus;
   delivery_address: string;
   delivery_fee: number;
@@ -103,6 +104,7 @@ export function DriverDashboardClient({
         id,
         order_id,
         driver_id,
+        offered_driver_id,
         status,
         delivery_address,
         delivery_fee,
@@ -157,7 +159,6 @@ export function DriverDashboardClient({
   }, [driverId, fetchDeliveries, restaurantId, supabase]);
 
   async function changeAvailability() {
-    setDebugMessage("Clique recebido: alterar disponibilidade");
 
     if (loadingAction) {
       return;
@@ -279,11 +280,15 @@ export function DriverDashboardClient({
       return false;
     }
 
-    if (
-      delivery.status === "searching_driver" ||
-      delivery.status === "offered"
-    ) {
-      return driverStatus === "available";
+    if (delivery.status === "offered") {
+      return (
+        driverStatus === "available" &&
+        delivery.offered_driver_id === driverId
+      );
+    }
+
+    if (delivery.status === "searching_driver") {
+      return false;
     }
 
     return delivery.driver_id === driverId;

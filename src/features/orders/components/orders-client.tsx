@@ -480,16 +480,12 @@ export function OrdersClient({
 
                     {order.status === "ready" &&
                       order.type === "delivery" && (
-                        <Button
-                          size="sm"
-                          className="bg-blue-600 hover:bg-blue-500"
-                          onClick={() =>
-                            updateStatus(order.id, "awaiting_driver")
-                          }
+                        <Badge
+                          variant="outline"
+                          className="h-9 border-violet-200 bg-violet-50 px-3 text-violet-700"
                         >
-                          <Bike className="mr-2 size-4" />
-                          Chamar estafeta
-                        </Button>
+                          A distribuir automaticamente
+                        </Badge>
                       )}
 
                     {order.status === "ready" &&

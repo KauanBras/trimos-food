@@ -16,6 +16,8 @@ import { Label } from "@/components/ui/label";
 type RegisterPageProps = {
   searchParams: Promise<{
     error?: string;
+    invite?: string;
+    accountType?: string;
   }>;
 };
 
@@ -23,6 +25,11 @@ export default async function RegisterPage({
   searchParams,
 }: RegisterPageProps) {
   const params = await searchParams;
+  const isDriverInvite =
+    params.accountType === "driver" && Boolean(params.invite);
+  const authContext = isDriverInvite
+    ? `?accountType=driver&invite=${encodeURIComponent(params.invite!)}`
+    : "";
 
   return (
     <Card className="border-zinc-200 shadow-xl shadow-zinc-200/50">
@@ -34,7 +41,9 @@ export default async function RegisterPage({
         <CardTitle className="text-2xl">Criar conta</CardTitle>
 
         <CardDescription>
-          Crie o primeiro acesso do restaurante.
+          {isDriverInvite
+            ? "Crie a sua conta para aceitar o convite de estafeta."
+            : "Crie o primeiro acesso do restaurante."}
         </CardDescription>
       </CardHeader>
 
@@ -46,12 +55,18 @@ export default async function RegisterPage({
         )}
 
         <form action={registerAction} className="space-y-4">
+          {isDriverInvite && (
+            <>
+              <input type="hidden" name="accountType" value="driver" />
+              <input type="hidden" name="invite" value={params.invite} />
+            </>
+          )}
           <div className="space-y-2">
             <Label htmlFor="fullName">Nome completo</Label>
             <Input
               id="fullName"
               name="fullName"
-              placeholder="Kauan Brandão"
+              placeholder="Nome completo"
               autoComplete="name"
               required
             />
@@ -108,7 +123,7 @@ export default async function RegisterPage({
         <p className="mt-6 text-center text-sm text-zinc-500">
           Já tem conta?{" "}
           <Link
-            href="/login"
+            href={`/login${authContext}`}
             className="font-semibold text-zinc-950 hover:underline"
           >
             Iniciar sessão

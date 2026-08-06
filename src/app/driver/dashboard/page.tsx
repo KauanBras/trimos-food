@@ -2,6 +2,7 @@ import {
   activateDriverModeAction,
 } from "@/features/drivers/actions/driver-actions";
 import { DriverDashboardClient } from "@/features/drivers/components/driver-dashboard-client";
+import { DriverPushSetup } from "@/features/notifications/components/driver-push-setup";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,7 +12,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentDriver } from "@/lib/drivers/get-current-driver";
-import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
 
 type DriverDashboardPageProps = {
@@ -24,7 +24,6 @@ export default async function DriverDashboardPage({
   searchParams,
 }: DriverDashboardPageProps) {
   const params = await searchParams;
-  const { restaurantId } = await getCurrentRestaurant();
   const { driver } = await getCurrentDriver();
 
   if (!driver) {
@@ -57,7 +56,17 @@ export default async function DriverDashboardPage({
     );
   }
 
+  const restaurantId = driver.restaurant_id;
   const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    throw new Error("Sessão do estafeta não encontrada.");
+  }
 
   const effectiveStatus =
     driver.status === "offline" ? "available" : driver.status;
@@ -81,6 +90,7 @@ export default async function DriverDashboardPage({
       id,
       order_id,
       driver_id,
+      offered_driver_id,
       status,
       delivery_address,
       delivery_fee,
@@ -119,14 +129,22 @@ export default async function DriverDashboardPage({
   }
 
   return (
-    <DriverDashboardClient
-      driverId={driver.id}
-      restaurantId={restaurantId}
+    <div className="space-y-5">
+      <DriverPushSetup
+        driverId={driver.id}
+        restaurantId={restaurantId}
+        userId={user.id}
+      />
+
+      <DriverDashboardClient
+        driverId={driver.id}
+        restaurantId={restaurantId}
       initialStatus={effectiveStatus}
       initialDeliveries={deliveries ?? []}
-      initialRejectedDeliveryIds={
-        rejections?.map((item) => item.delivery_id) ?? []
-      }
-    />
+        initialRejectedDeliveryIds={
+          rejections?.map((item) => item.delivery_id) ?? []
+        }
+      />
+    </div>
   );
 }

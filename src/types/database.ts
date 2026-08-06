@@ -104,10 +104,14 @@ export type Database = {
           delivered_at: string | null
           delivery_address: string
           delivery_fee: number
+          dispatch_attempts: number
           distance_km: number | null
           driver_id: string | null
           id: string
+          offer_expires_at: string | null
+          offer_started_at: string | null
           offered_at: string | null
+          offered_driver_id: string | null
           order_id: string
           picked_up_at: string | null
           restaurant_id: string
@@ -121,10 +125,14 @@ export type Database = {
           delivered_at?: string | null
           delivery_address: string
           delivery_fee?: number
+          dispatch_attempts?: number
           distance_km?: number | null
           driver_id?: string | null
           id?: string
+          offer_expires_at?: string | null
+          offer_started_at?: string | null
           offered_at?: string | null
+          offered_driver_id?: string | null
           order_id: string
           picked_up_at?: string | null
           restaurant_id: string
@@ -138,10 +146,14 @@ export type Database = {
           delivered_at?: string | null
           delivery_address?: string
           delivery_fee?: number
+          dispatch_attempts?: number
           distance_km?: number | null
           driver_id?: string | null
           id?: string
+          offer_expires_at?: string | null
+          offer_started_at?: string | null
           offered_at?: string | null
+          offered_driver_id?: string | null
           order_id?: string
           picked_up_at?: string | null
           restaurant_id?: string
@@ -152,6 +164,13 @@ export type Database = {
           {
             foreignKeyName: "deliveries_driver_id_fkey"
             columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliveries_offered_driver_id_fkey"
+            columns: ["offered_driver_id"]
             isOneToOne: false
             referencedRelation: "drivers"
             referencedColumns: ["id"]
@@ -204,6 +223,64 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          created_by: string
+          email: string
+          expires_at: string
+          id: string
+          restaurant_id: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          created_by: string
+          email: string
+          expires_at?: string
+          id?: string
+          restaurant_id: string
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          created_by?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          restaurant_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_invites_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_invites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_invites_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
             referencedColumns: ["id"]
           },
         ]
@@ -525,6 +602,76 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          auth_key: string
+          created_at: string
+          device_name: string | null
+          driver_id: string | null
+          endpoint: string
+          id: string
+          is_active: boolean
+          last_used_at: string | null
+          p256dh: string
+          restaurant_id: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth_key: string
+          created_at?: string
+          device_name?: string | null
+          driver_id?: string | null
+          endpoint: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          p256dh: string
+          restaurant_id: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth_key?: string
+          created_at?: string
+          device_name?: string | null
+          driver_id?: string | null
+          endpoint?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          p256dh?: string
+          restaurant_id?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       restaurant_settings: {
         Row: {
           auto_accept_orders: boolean
@@ -718,6 +865,10 @@ export type Database = {
         Args: { requested_delivery_id: string }
         Returns: undefined
       }
+      accept_driver_invite: {
+        Args: { requested_token: string }
+        Returns: string
+      }
       activate_current_user_as_driver: { Args: never; Returns: string }
       complete_delivery: {
         Args: { requested_delivery_id: string }
@@ -729,6 +880,10 @@ export type Database = {
       }
       create_restaurant_for_current_user: {
         Args: { restaurant_name: string; restaurant_slug: string }
+        Returns: string
+      }
+      dispatch_next_driver: {
+        Args: { requested_delivery_id: string }
         Returns: string
       }
       has_restaurant_role: {
@@ -747,6 +902,7 @@ export type Database = {
         Args: { requested_delivery_id: string }
         Returns: undefined
       }
+      process_expired_delivery_offers: { Args: never; Returns: number }
       reject_delivery: {
         Args: { requested_delivery_id: string }
         Returns: undefined

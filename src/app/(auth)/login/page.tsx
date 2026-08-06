@@ -17,6 +17,8 @@ type LoginPageProps = {
   searchParams: Promise<{
     error?: string;
     success?: string;
+    invite?: string;
+    accountType?: string;
   }>;
 };
 
@@ -24,6 +26,11 @@ export default async function LoginPage({
   searchParams,
 }: LoginPageProps) {
   const params = await searchParams;
+  const isDriverInvite =
+    params.accountType === "driver" && Boolean(params.invite);
+  const authContext = isDriverInvite
+    ? `?accountType=driver&invite=${encodeURIComponent(params.invite!)}`
+    : "";
 
   return (
     <Card className="border-zinc-200 shadow-xl shadow-zinc-200/50">
@@ -35,7 +42,9 @@ export default async function LoginPage({
         <CardTitle className="text-2xl">Iniciar sessão</CardTitle>
 
         <CardDescription>
-          Entre para aceder ao painel do restaurante.
+          {isDriverInvite
+            ? "Inicie sessão para aceitar o convite de estafeta."
+            : "Entre para aceder ao seu painel."}
         </CardDescription>
       </CardHeader>
 
@@ -53,6 +62,12 @@ export default async function LoginPage({
         )}
 
         <form action={loginAction} className="space-y-5">
+          {isDriverInvite && (
+            <>
+              <input type="hidden" name="accountType" value="driver" />
+              <input type="hidden" name="invite" value={params.invite} />
+            </>
+          )}
           <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
             <Input
@@ -98,7 +113,7 @@ export default async function LoginPage({
         <p className="mt-6 text-center text-sm text-zinc-500">
           Ainda não tem conta?{" "}
           <Link
-            href="/register"
+            href={`/register${authContext}`}
             className="font-semibold text-zinc-950 hover:underline"
           >
             Criar conta

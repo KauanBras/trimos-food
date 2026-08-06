@@ -60,7 +60,7 @@ export default function DriverLayout({
           </Link>
 
           <form action={logoutAction}>
-            <Button variant="outline" size="icon">
+            <Button type="submit" variant="outline" size="icon">
               <LogOut className="size-4" />
             </Button>
           </form>
