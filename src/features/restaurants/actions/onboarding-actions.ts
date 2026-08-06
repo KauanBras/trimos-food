@@ -1,0 +1,62 @@
+"use server";
+
+import { redirect } from "next/navigation";
+
+import { createClient } from "@/lib/supabase/server";
+
+function createSlug(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export async function createRestaurantAction(formData: FormData) {
+  const rawName = formData.get("restaurantName");
+
+  if (typeof rawName !== "string" || !rawName.trim()) {
+    redirect(
+      `/onboarding?error=${encodeURIComponent(
+        "Indique o nome do restaurante."
+      )}`
+    );
+  }
+
+  const restaurantName = rawName.trim();
+  const restaurantSlug = createSlug(restaurantName);
+
+  if (!restaurantSlug) {
+    redirect(
+      `/onboarding?error=${encodeURIComponent(
+        "Não foi possível gerar um endereço válido."
+      )}`
+    );
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { error } = await supabase.rpc(
+    "create_restaurant_for_current_user",
+    {
+      restaurant_name: restaurantName,
+      restaurant_slug: restaurantSlug,
+    }
+  );
+
+  if (error) {
+    redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
+  }
+
+  redirect("/restaurant/dashboard");
+}
