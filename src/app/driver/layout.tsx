@@ -19,17 +19,17 @@ const navigation = [
   },
   {
     label: "Entregas",
-    href: "/driver/dashboard",
+    href: "/driver/entregas",
     icon: PackageCheck,
   },
   {
     label: "Histórico",
-    href: "/driver/history",
+    href: "/driver/historico",
     icon: History,
   },
   {
     label: "Perfil",
-    href: "/driver/profile",
+    href: "/driver/perfil",
     icon: UserRound,
   },
 ];

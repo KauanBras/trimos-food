@@ -8,16 +8,24 @@ export async function getAuthDestination(
   supabase: AppSupabaseClient,
   userId: string
 ) {
-  /*
-   * Um utilizador com perfil de estafeta deve entrar diretamente
-   * no painel do estafeta, mesmo que não seja proprietário.
-   */
-  const { data: driver, error: driverError } = await supabase
-    .from("drivers")
-    .select("id, is_active")
-    .eq("user_id", userId)
-    .eq("is_active", true)
-    .maybeSingle();
+  const [
+    { data: driver, error: driverError },
+    { data: membership, error: membershipError },
+  ] = await Promise.all([
+    supabase
+      .from("drivers")
+      .select("id, is_active")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .maybeSingle(),
+
+    supabase
+      .from("restaurant_users")
+      .select("restaurant_id, role")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .maybeSingle(),
+  ]);
 
   if (driverError) {
     throw new Error(
@@ -25,34 +33,27 @@ export async function getAuthDestination(
     );
   }
 
-  if (driver) {
-    return "/driver/dashboard";
-  }
-
-  /*
-   * Proprietários e restantes membros do restaurante entram
-   * pelo painel do restaurante.
-   */
-  const { data: membership, error: membershipError } = await supabase
-    .from("restaurant_users")
-    .select("restaurant_id, role")
-    .eq("user_id", userId)
-    .eq("is_active", true)
-    .maybeSingle();
-
   if (membershipError) {
     throw new Error(
       `Não foi possível verificar o restaurante: ${membershipError.message}`
     );
   }
 
+  /*
+   * Se a mesma conta tiver os dois perfis,
+   * o utilizador escolhe em qual operação pretende entrar.
+   */
+  if (driver && membership) {
+    return "/select-role";
+  }
+
   if (membership) {
     return "/restaurant/dashboard";
   }
 
-  /*
-   * Conta confirmada, mas ainda sem vínculo operacional.
-   * Neste momento o único onboarding disponível é o de restaurante.
-   */
+  if (driver) {
+    return "/driver/dashboard";
+  }
+
   return "/onboarding";
 }

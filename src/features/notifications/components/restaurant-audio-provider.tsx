@@ -137,6 +137,12 @@ export function RestaurantAudioProvider({
   }, [fetchNewOrdersCount]);
 
   useEffect(() => {
+    void fetchNewOrdersCount();
+
+    const pollingId = window.setInterval(() => {
+      void fetchNewOrdersCount();
+    }, 4000);
+
     const channel = supabase
       .channel(`restaurant-global-audio-${restaurantId}`)
       .on(
@@ -182,6 +188,7 @@ export function RestaurantAudioProvider({
       });
 
     return () => {
+      window.clearInterval(pollingId);
       stopNotificationAlarm();
       void supabase.removeChannel(channel);
     };

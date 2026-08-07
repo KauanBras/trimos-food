@@ -113,7 +113,17 @@ export function DriverDashboardClient({
   );
 
   const [now, setNow] = useState(() => Date.now());
-  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return (
+      window.localStorage.getItem(
+        "trimos-driver-audio-enabled"
+      ) === "true"
+    );
+  });
 
   const enableOfferAudio = useCallback(async () => {
     try {
@@ -122,8 +132,8 @@ export function DriverDashboardClient({
       setAudioEnabled(enabled);
 
       if (enabled) {
-        window.sessionStorage.setItem(
-          "trimos-driver-audio-unlocked",
+        window.localStorage.setItem(
+          "trimos-driver-audio-enabled",
           "true"
         );
       }
