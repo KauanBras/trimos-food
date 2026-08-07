@@ -39,6 +39,7 @@ type DriverDelivery = {
   delivery_address: string;
   delivery_fee: number;
   distance_km: number | null;
+  offer_expires_at: string | null;
   created_at: string;
   orders: {
     customer_name: string;
@@ -75,6 +76,14 @@ function deliveryStatusLabel(status: DeliveryStatus) {
   return labels[status];
 }
 
+function getRemainingOfferSeconds(expiresAt: string | null, now: number) {
+  if (!expiresAt) {
+    return 0;
+  }
+
+  return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now) / 1000));
+}
+
 export function DriverDashboardClient({
   driverId,
   restaurantId,
@@ -97,6 +106,8 @@ export function DriverDashboardClient({
     null
   );
 
+  const [now, setNow] = useState(() => Date.now());
+
   const fetchDeliveries = useCallback(async () => {
     const { data, error } = await supabase
       .from("deliveries")
@@ -109,6 +120,7 @@ export function DriverDashboardClient({
         delivery_address,
         delivery_fee,
         distance_km,
+        offer_expires_at,
         created_at,
         orders (
           customer_name,
@@ -132,6 +144,7 @@ export function DriverDashboardClient({
       return;
     }
 
+    setNow(Date.now());
     setDeliveries((data ?? []) as DriverDelivery[]);
   }, [restaurantId, supabase]);
 
@@ -151,12 +164,68 @@ export function DriverDashboardClient({
           void fetchDeliveries();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          void fetchDeliveries();
+        }
+      });
 
     return () => {
       void supabase.removeChannel(channel);
     };
   }, [driverId, fetchDeliveries, restaurantId, supabase]);
+
+  useEffect(() => {
+    const hasOffer = deliveries.some(
+      (delivery) =>
+        delivery.status === "offered" &&
+        delivery.offered_driver_id === driverId
+    );
+
+    if (!hasOffer) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setNow(Date.now());
+    }, 250);
+
+    return () => window.clearInterval(interval);
+  }, [deliveries, driverId]);
+
+  useEffect(() => {
+    const expiredOffer = deliveries.find(
+      (delivery) =>
+        delivery.status === "offered" &&
+        delivery.offered_driver_id === driverId &&
+        getRemainingOfferSeconds(delivery.offer_expires_at, now) === 0
+    );
+
+    if (!expiredOffer || loadingAction) {
+      return;
+    }
+
+    const expireOffer = async () => {
+      setLoadingAction(`expire-${expiredOffer.id}`);
+
+      try {
+        const { error } = await supabase.rpc(
+          "expire_my_delivery_offer",
+          { requested_delivery_id: expiredOffer.id }
+        );
+
+        if (error) {
+          console.error("Não foi possível expirar a oferta:", error.message);
+        }
+
+        await fetchDeliveries();
+      } finally {
+        setLoadingAction(null);
+      }
+    };
+
+    void expireOffer();
+  }, [deliveries, driverId, fetchDeliveries, loadingAction, now, supabase]);
 
   async function changeAvailability() {
 
@@ -394,6 +463,14 @@ export function DriverDashboardClient({
           <div className="space-y-4">
             {visibleDeliveries.map((delivery) => {
               const customer = delivery.orders;
+              const remainingSeconds =
+                delivery.status === "offered"
+                  ? getRemainingOfferSeconds(
+                      delivery.offer_expires_at,
+                      now
+                    )
+                  : null;
+              const offerExpired = remainingSeconds === 0;
 
               return (
                 <Card
@@ -433,6 +510,31 @@ export function DriverDashboardClient({
                   </CardHeader>
 
                   <CardContent className="space-y-4 p-5">
+                    {remainingSeconds !== null && (
+                      <div
+                        className="rounded-2xl bg-amber-50 p-4"
+                        role="timer"
+                        aria-live="polite"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-medium uppercase tracking-wide text-amber-700">
+                              Tempo para responder
+                            </p>
+                            <p className="mt-1 text-sm text-amber-800">
+                              {offerExpired
+                                ? "A redistribuir a oferta..."
+                                : "Aceite antes que passe ao próximo estafeta."}
+                            </p>
+                          </div>
+
+                          <span className="min-w-16 text-right text-3xl font-bold tabular-nums text-amber-700">
+                            0:{String(remainingSeconds).padStart(2, "0")}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex gap-3 rounded-2xl bg-zinc-50 p-4">
                       <MapPin className="mt-0.5 size-5 shrink-0 text-zinc-500" />
 
@@ -478,7 +580,7 @@ export function DriverDashboardClient({
                           type="button"
                           variant="outline"
                           className="h-12"
-                          disabled={loadingAction !== null}
+                          disabled={loadingAction !== null || offerExpired}
                           onClick={() =>
                             void rejectDelivery(delivery.id)
                           }
@@ -490,7 +592,7 @@ export function DriverDashboardClient({
                         <Button
                           type="button"
                           className="h-12 bg-zinc-950 hover:bg-zinc-800"
-                          disabled={loadingAction !== null}
+                          disabled={loadingAction !== null || offerExpired}
                           onClick={() =>
                             void executeDeliveryAction(
                               delivery.id,

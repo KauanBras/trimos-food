@@ -95,6 +95,7 @@ export default async function DriverDashboardPage({
       delivery_address,
       delivery_fee,
       distance_km,
+      offer_expires_at,
       created_at,
       orders (
         customer_name,
@@ -139,8 +140,8 @@ export default async function DriverDashboardPage({
       <DriverDashboardClient
         driverId={driver.id}
         restaurantId={restaurantId}
-      initialStatus={effectiveStatus}
-      initialDeliveries={deliveries ?? []}
+        initialStatus={effectiveStatus}
+        initialDeliveries={deliveries ?? []}
         initialRejectedDeliveryIds={
           rejections?.map((item) => item.delivery_id) ?? []
         }

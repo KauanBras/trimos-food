@@ -92,9 +92,12 @@ function playDriverPattern() {
 }
 
 export async function unlockNotificationAudio() {
+  const wasRunning = getAudioContext()?.state === "running";
   const context = await ensureAudioReady();
 
-  playTone(880, 0.18);
+  if (!wasRunning) {
+    playTone(880, 0.18);
+  }
 
   return context.state === "running";
 }
@@ -113,9 +116,20 @@ export function startNotificationAlarm(type: AlarmType) {
       ? playRestaurantPattern
       : playDriverPattern;
 
-  playPattern();
+  const playWhenReady = async () => {
+    try {
+      await ensureAudioReady();
+      playPattern();
+    } catch (error) {
+      console.error("Não foi possível tocar o alarme:", error);
+    }
+  };
 
-  alarmInterval = setInterval(playPattern, 2800);
+  void playWhenReady();
+
+  alarmInterval = setInterval(() => {
+    void playWhenReady();
+  }, 2800);
 }
 
 export function stopNotificationAlarm() {

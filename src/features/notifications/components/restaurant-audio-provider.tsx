@@ -59,10 +59,6 @@ export function RestaurantAudioProvider({
   }, [restaurantId, supabase, syncAlarm]);
 
   const unlockAudio = useCallback(async () => {
-    if (audioUnlockedRef.current) {
-      return;
-    }
-
     try {
       await unlockNotificationAudio();
 
@@ -115,6 +111,28 @@ export function RestaurantAudioProvider({
   }, [unlockAudio]);
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void fetchNewOrdersCount();
+      }
+    };
+
+    window.addEventListener("focus", fetchNewOrdersCount);
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    return () => {
+      window.removeEventListener("focus", fetchNewOrdersCount);
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+    };
+  }, [fetchNewOrdersCount]);
+
+  useEffect(() => {
     const channel = supabase
       .channel(`restaurant-global-audio-${restaurantId}`)
       .on(
@@ -153,7 +171,11 @@ export function RestaurantAudioProvider({
           void fetchNewOrdersCount();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          void fetchNewOrdersCount();
+        }
+      });
 
     return () => {
       stopNotificationAlarm();

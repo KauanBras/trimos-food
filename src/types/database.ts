@@ -886,6 +886,10 @@ export type Database = {
         Args: { requested_delivery_id: string }
         Returns: string
       }
+      expire_my_delivery_offer: {
+        Args: { requested_delivery_id: string }
+        Returns: boolean
+      }
       has_restaurant_role: {
         Args: {
           allowed_roles: Database["public"]["Enums"]["restaurant_role"][]
