@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BellRing } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import {
   startNotificationAlarm,
   stopNotificationAlarm,
@@ -22,6 +24,7 @@ export function RestaurantAudioProvider({
 
   const audioUnlockedRef = useRef(false);
   const newOrdersCountRef = useRef(initialNewOrders);
+  const [audioEnabled, setAudioEnabled] = useState(false);
 
   const syncAlarm = useCallback((count: number) => {
     newOrdersCountRef.current = count;
@@ -63,6 +66,7 @@ export function RestaurantAudioProvider({
       await unlockNotificationAudio();
 
       audioUnlockedRef.current = true;
+      setAudioEnabled(true);
 
       window.sessionStorage.setItem(
         "trimos-restaurant-audio-unlocked",
@@ -183,5 +187,34 @@ export function RestaurantAudioProvider({
     };
   }, [fetchNewOrdersCount, restaurantId, supabase]);
 
-  return null;
+  if (audioEnabled) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-xl">
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl bg-amber-100 p-2 text-amber-700">
+          <BellRing className="size-5" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-amber-950">
+            Ativar som dos pedidos
+          </p>
+          <p className="text-sm text-amber-800">
+            Necessário para o alarme tocar até o pedido ser aceite.
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          className="shrink-0 bg-amber-500 text-zinc-950 hover:bg-amber-400"
+          onClick={() => void unlockAudio()}
+        >
+          Ativar som
+        </Button>
+      </div>
+    </div>
+  );
 }

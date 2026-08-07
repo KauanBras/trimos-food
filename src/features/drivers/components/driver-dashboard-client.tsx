@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  BellRing,
   Bike,
   Check,
   Clock3,
@@ -22,6 +23,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
+import {
+  startNotificationAlarm,
+  stopNotificationAlarm,
+  unlockNotificationAudio,
+} from "@/lib/audio/notification-alarm";
 import type { Database } from "@/types/database";
 
 type DriverStatus =
@@ -107,6 +113,27 @@ export function DriverDashboardClient({
   );
 
   const [now, setNow] = useState(() => Date.now());
+  const [audioEnabled, setAudioEnabled] = useState(false);
+
+  const enableOfferAudio = useCallback(async () => {
+    try {
+      const enabled = await unlockNotificationAudio();
+
+      setAudioEnabled(enabled);
+
+      if (enabled) {
+        window.sessionStorage.setItem(
+          "trimos-driver-audio-unlocked",
+          "true"
+        );
+      }
+    } catch (error) {
+      toast.error("Não foi possível ativar o som", {
+        description:
+          error instanceof Error ? error.message : "Erro desconhecido.",
+      });
+    }
+  }, []);
 
   const fetchDeliveries = useCallback(async () => {
     const { data, error } = await supabase
@@ -192,6 +219,22 @@ export function DriverDashboardClient({
 
     return () => window.clearInterval(interval);
   }, [deliveries, driverId]);
+
+  useEffect(() => {
+    const hasActiveOffer = deliveries.some(
+      (delivery) =>
+        delivery.status === "offered" &&
+        delivery.offered_driver_id === driverId
+    );
+
+    if (audioEnabled && hasActiveOffer) {
+      startNotificationAlarm("driver");
+    } else {
+      stopNotificationAlarm();
+    }
+
+    return () => stopNotificationAlarm();
+  }, [audioEnabled, deliveries, driverId]);
 
   useEffect(() => {
     const expiredOffer = deliveries.find(
@@ -365,6 +408,33 @@ export function DriverDashboardClient({
 
   return (
     <div className="space-y-5">
+      {!audioEnabled && (
+        <Card className="border-amber-200 bg-amber-50 shadow-none">
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="rounded-xl bg-amber-100 p-2 text-amber-700">
+              <BellRing className="size-5" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-amber-950">
+                Ativar som das ofertas
+              </p>
+              <p className="text-sm text-amber-800">
+                O alarme tocará continuamente durante os 30 segundos.
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              className="shrink-0 bg-amber-500 text-zinc-950 hover:bg-amber-400"
+              onClick={() => void enableOfferAudio()}
+            >
+              Ativar som
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="overflow-hidden border-0 bg-zinc-950 text-white shadow-lg">
         <CardContent className="p-6">
           <div className="flex items-start justify-between gap-4">
