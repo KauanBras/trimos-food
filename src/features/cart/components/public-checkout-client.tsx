@@ -324,7 +324,7 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
                   <span>{money.format(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Taxa de entrega</span>
+                  <span>Taxa fixa de entrega</span>
                   <span>{money.format(deliveryFee)}</span>
                 </div>
                 {settings.freeDeliveryFrom !== null &&

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database";
 
 export type SettingsActionResult = {
   ok: boolean;
@@ -80,57 +81,64 @@ export async function updateRestaurantSettingsAction(
       };
     }
 
-    const name = textValue(formData, "name") || restaurant.name;
-    if (name.length < 2) {
-      return { ok: false, message: "Indique o nome do restaurante." };
-    }
-
     const supabase = await createClient();
-    const [uploadedLogo, uploadedCover] = await Promise.all([
-      uploadBrandingImage(formData, "logoFile", restaurantId),
-      uploadBrandingImage(formData, "coverFile", restaurantId),
-    ]);
+    const identitySectionPresent = formData.has("identitySectionPresent");
+    const operationSectionPresent = formData.has("operationSectionPresent");
+    const reservationsSectionPresent = formData.has("reservationsSectionPresent");
+    const hoursSectionPresent = formData.has("hoursSectionPresent");
 
-    const removeLogo = formData.get("removeLogo") === "on";
-    const removeCover = formData.get("removeCover") === "on";
+    if (identitySectionPresent) {
+      const name = textValue(formData, "name") || restaurant.name;
+      if (name.length < 2) {
+        return { ok: false, message: "Indique o nome do restaurante." };
+      }
 
-    const logoUrl = removeLogo
-      ? null
-      : uploadedLogo ?? restaurant.logo_url ?? null;
-    const coverUrl = removeCover
-      ? null
-      : uploadedCover ?? restaurant.cover_url ?? null;
-
-    const { error: restaurantError } = await supabase
-      .from("restaurants")
-      .update({
-        name,
-        description: optionalText(formData, "description"),
-        logo_url: logoUrl,
-        cover_url: coverUrl,
-        phone: optionalText(formData, "phone"),
-        email: optionalText(formData, "email"),
-        tax_number: optionalText(formData, "taxNumber"),
-        address_line: optionalText(formData, "addressLine"),
-        city: optionalText(formData, "city"),
-        postal_code: optionalText(formData, "postalCode"),
-        accepts_delivery: formData.get("acceptsDelivery") === "on",
-        accepts_pickup: formData.get("acceptsPickup") === "on",
-        accepts_dine_in: formData.get("acceptsDineIn") === "on",
-        accepts_reservations: formData.get("acceptsReservations") === "on",
-      })
-      .eq("id", restaurantId);
-
-    if (restaurantError) {
-      throw new Error(restaurantError.message);
+      const [uploadedLogo, uploadedCover] = await Promise.all([
+        uploadBrandingImage(formData, "logoFile", restaurantId),
+        uploadBrandingImage(formData, "coverFile", restaurantId),
+      ]);
+      const removeLogo = formData.get("removeLogo") === "on";
+      const removeCover = formData.get("removeCover") === "on";
+      const { error: identityError } = await supabase
+        .from("restaurants")
+        .update({
+          name,
+          description: optionalText(formData, "description"),
+          logo_url: removeLogo ? null : uploadedLogo ?? restaurant.logo_url ?? null,
+          cover_url: removeCover ? null : uploadedCover ?? restaurant.cover_url ?? null,
+          phone: optionalText(formData, "phone"),
+          email: optionalText(formData, "email"),
+          tax_number: optionalText(formData, "taxNumber"),
+          address_line: optionalText(formData, "addressLine"),
+          city: optionalText(formData, "city"),
+          postal_code: optionalText(formData, "postalCode"),
+        })
+        .eq("id", restaurantId);
+      if (identityError) throw new Error(identityError.message);
     }
 
-    const { error: settingsError } = await supabase
-      .from("restaurant_settings")
-      .update({
-        primary_color: textValue(formData, "primaryColor") || "#fbbf24",
-        secondary_color:
-          textValue(formData, "secondaryColor") || "#18181b",
+    if (operationSectionPresent) {
+      const { error: operationError } = await supabase
+        .from("restaurants")
+        .update({
+          accepts_delivery: formData.get("acceptsDelivery") === "on",
+          accepts_pickup: formData.get("acceptsPickup") === "on",
+          accepts_dine_in: formData.get("acceptsDineIn") === "on",
+          accepts_reservations: formData.get("acceptsReservations") === "on",
+        })
+        .eq("id", restaurantId);
+      if (operationError) throw new Error(operationError.message);
+    }
+
+    const settingsUpdates: Database["public"]["Tables"]["restaurant_settings"]["Update"] = {};
+
+    if (identitySectionPresent) {
+      settingsUpdates.primary_color = textValue(formData, "primaryColor") || "#fbbf24";
+      settingsUpdates.secondary_color = textValue(formData, "secondaryColor") || "#18181b";
+    }
+
+    if (operationSectionPresent) {
+      Object.assign(settingsUpdates, {
         delivery_radius_km: Math.max(
           0,
           numberValue(formData, "deliveryRadiusKm", 5),
@@ -153,6 +161,11 @@ export async function updateRestaurantSettingsAction(
         ),
         order_sound_enabled: formData.get("orderSoundEnabled") === "on",
         auto_accept_orders: formData.get("autoAcceptOrders") === "on",
+      });
+    }
+
+    if (reservationsSectionPresent) {
+      Object.assign(settingsUpdates, {
         reservation_slot_minutes: Math.min(
           120,
           Math.max(
@@ -185,27 +198,29 @@ export async function updateRestaurantSettingsAction(
         ),
         auto_confirm_reservations:
           formData.get("autoConfirmReservations") === "on",
-      })
-      .eq("restaurant_id", restaurantId);
-
-    if (settingsError) {
-      throw new Error(settingsError.message);
+      });
     }
 
-    const hours = Array.from({ length: 7 }, (_, dayOfWeek) => ({
-      restaurant_id: restaurantId,
-      day_of_week: dayOfWeek,
-      is_closed: formData.get(`day-${dayOfWeek}-open`) !== "on",
-      opens_at: textValue(formData, `day-${dayOfWeek}-opens`) || null,
-      closes_at: textValue(formData, `day-${dayOfWeek}-closes`) || null,
-    }));
+    if (Object.keys(settingsUpdates).length > 0) {
+      const { error: settingsError } = await supabase
+        .from("restaurant_settings")
+        .update(settingsUpdates)
+        .eq("restaurant_id", restaurantId);
+      if (settingsError) throw new Error(settingsError.message);
+    }
 
-    const { error: hoursError } = await supabase
-      .from("business_hours")
-      .upsert(hours, { onConflict: "restaurant_id,day_of_week" });
-
-    if (hoursError) {
-      throw new Error(hoursError.message);
+    if (hoursSectionPresent) {
+      const hours = Array.from({ length: 7 }, (_, dayOfWeek) => ({
+        restaurant_id: restaurantId,
+        day_of_week: dayOfWeek,
+        is_closed: formData.get(`day-${dayOfWeek}-open`) !== "on",
+        opens_at: textValue(formData, `day-${dayOfWeek}-opens`) || null,
+        closes_at: textValue(formData, `day-${dayOfWeek}-closes`) || null,
+      }));
+      const { error: hoursError } = await supabase
+        .from("business_hours")
+        .upsert(hours, { onConflict: "restaurant_id,day_of_week" });
+      if (hoursError) throw new Error(hoursError.message);
     }
 
     revalidatePath("/restaurant/settings");

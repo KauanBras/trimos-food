@@ -178,6 +178,7 @@ export function RestaurantSettingsForm({
         </TabsList>
 
         <TabsContent value="identity" keepMounted className="space-y-6">
+          <input type="hidden" name="identitySectionPresent" value="true" />
           <Card className="overflow-hidden border-zinc-200 shadow-none">
             <div
               className="relative h-52 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-700 bg-cover bg-center"
@@ -314,6 +315,7 @@ export function RestaurantSettingsForm({
         </TabsContent>
 
         <TabsContent value="operation" keepMounted className="space-y-6">
+          <input type="hidden" name="operationSectionPresent" value="true" />
           <Card className="border-zinc-200 shadow-none">
             <CardHeader><CardTitle className="text-lg">Canais de venda</CardTitle></CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -335,9 +337,9 @@ export function RestaurantSettingsForm({
             <CardHeader><CardTitle className="text-lg">Pedidos e entregas</CardTitle></CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {[
-                ["deliveryRadiusKm", "Raio de entrega (km)", settings.delivery_radius_km],
+                ["deliveryRadiusKm", "Raio operacional (km)", settings.delivery_radius_km],
                 ["minimumOrderAmount", "Pedido mínimo (€)", settings.minimum_order_amount],
-                ["defaultDeliveryFee", "Taxa de entrega (€)", settings.default_delivery_fee],
+                ["defaultDeliveryFee", "Taxa fixa de entrega (€)", settings.default_delivery_fee],
                 ["freeDeliveryFrom", "Entrega grátis a partir de (€)", settings.free_delivery_from ?? ""],
                 ["defaultPreparationMinutes", "Preparação padrão (min)", settings.default_preparation_minutes],
               ].map(([name, label, value]) => (
@@ -346,6 +348,9 @@ export function RestaurantSettingsForm({
                   <Input id={String(name)} name={String(name)} type="number" min="0" step="0.01" defaultValue={value} />
                 </div>
               ))}
+              <p className="text-xs leading-5 text-zinc-500 sm:col-span-2 lg:col-span-3">
+                A taxa é cobrada uma única vez por entrega. O raio serve como limite operacional para a equipa; a validação automática da morada exige uma integração de mapas.
+              </p>
               <label className="flex items-center justify-between rounded-2xl border border-zinc-200 p-4 sm:col-span-2 lg:col-span-1">
                 <span className="text-sm font-medium">Som dos pedidos</span>
                 <Switch name="orderSoundEnabled" defaultChecked={settings.order_sound_enabled} />
@@ -359,6 +364,7 @@ export function RestaurantSettingsForm({
         </TabsContent>
 
         <TabsContent value="reservations" keepMounted>
+          <input type="hidden" name="reservationsSectionPresent" value="true" />
           <Card className="border-zinc-200 shadow-none">
             <CardHeader><CardTitle className="text-lg">Regras das reservas</CardTitle></CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2">
@@ -385,6 +391,7 @@ export function RestaurantSettingsForm({
         </TabsContent>
 
         <TabsContent value="hours" keepMounted>
+          <input type="hidden" name="hoursSectionPresent" value="true" />
           <Card className="border-zinc-200 shadow-none">
             <CardHeader><CardTitle className="text-lg">Horário semanal</CardTitle></CardHeader>
             <CardContent className="space-y-3">
