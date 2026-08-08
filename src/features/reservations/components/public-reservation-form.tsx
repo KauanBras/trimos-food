@@ -62,20 +62,27 @@ export function PublicReservationForm({
   const availableTimes = useMemo(() => {
     if (!date) return [];
     const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
-    const hours = businessHours.find((item) => item.day_of_week === dayOfWeek);
-    if (!hours || hours.is_closed || !hours.opens_at || !hours.closes_at) return [];
+    const periods = businessHours
+      .filter((item) =>
+        item.day_of_week === dayOfWeek
+        && !item.is_closed
+        && item.opens_at
+        && item.closes_at,
+      )
+      .sort((a, b) => minutesFromTime(a.opens_at!) - minutesFromTime(b.opens_at!));
+    const values = new Set<string>();
 
-    const opens = minutesFromTime(hours.opens_at);
-    let closes = minutesFromTime(hours.closes_at);
-    if (closes <= opens) closes += 24 * 60;
-    const values: string[] = [];
-    for (let minute = opens; minute < closes; minute += slotMinutes) {
-      if (values.length >= 48) break;
-      const value = formatTime(minute);
-      if (date === localIsoDate(today) && minute <= today.getHours() * 60 + today.getMinutes()) continue;
-      values.push(value);
+    for (const period of periods) {
+      const opens = minutesFromTime(period.opens_at!);
+      const rawCloses = minutesFromTime(period.closes_at!);
+      const closes = rawCloses <= opens ? 24 * 60 : rawCloses;
+      for (let minute = opens; minute < closes && values.size < 48; minute += slotMinutes) {
+        if (date === localIsoDate(today) && minute <= today.getHours() * 60 + today.getMinutes()) continue;
+        values.add(formatTime(minute));
+      }
     }
-    return values;
+
+    return Array.from(values).sort();
   }, [businessHours, date, slotMinutes, today]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {

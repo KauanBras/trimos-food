@@ -23,6 +23,7 @@ export type Database = {
           is_closed: boolean
           opens_at: string | null
           restaurant_id: string
+          sort_order: number
           updated_at: string
         }
         Insert: {
@@ -33,6 +34,7 @@ export type Database = {
           is_closed?: boolean
           opens_at?: string | null
           restaurant_id: string
+          sort_order?: number
           updated_at?: string
         }
         Update: {
@@ -43,6 +45,7 @@ export type Database = {
           is_closed?: boolean
           opens_at?: string | null
           restaurant_id?: string
+          sort_order?: number
           updated_at?: string
         }
         Relationships: [
@@ -499,7 +502,10 @@ export type Database = {
           customer_name: string
           customer_phone: string | null
           delivery_address: string | null
+          delivery_distance_km: number | null
           delivery_fee: number
+          delivery_latitude: number | null
+          delivery_longitude: number | null
           estimated_minutes: number | null
           id: string
           notes: string | null
@@ -522,7 +528,10 @@ export type Database = {
           customer_name: string
           customer_phone?: string | null
           delivery_address?: string | null
+          delivery_distance_km?: number | null
           delivery_fee?: number
+          delivery_latitude?: number | null
+          delivery_longitude?: number | null
           estimated_minutes?: number | null
           id?: string
           notes?: string | null
@@ -545,7 +554,10 @@ export type Database = {
           customer_name?: string
           customer_phone?: string | null
           delivery_address?: string | null
+          delivery_distance_km?: number | null
           delivery_fee?: number
+          delivery_latitude?: number | null
+          delivery_longitude?: number | null
           estimated_minutes?: number | null
           id?: string
           notes?: string | null
@@ -966,6 +978,9 @@ export type Database = {
           created_at: string
           default_delivery_fee: number
           default_preparation_minutes: number
+          delivery_fee_per_km: number
+          delivery_origin_latitude: number | null
+          delivery_origin_longitude: number | null
           delivery_radius_km: number
           free_delivery_from: number | null
           minimum_order_amount: number
@@ -985,6 +1000,9 @@ export type Database = {
           created_at?: string
           default_delivery_fee?: number
           default_preparation_minutes?: number
+          delivery_fee_per_km?: number
+          delivery_origin_latitude?: number | null
+          delivery_origin_longitude?: number | null
           delivery_radius_km?: number
           free_delivery_from?: number | null
           minimum_order_amount?: number
@@ -1004,6 +1022,9 @@ export type Database = {
           created_at?: string
           default_delivery_fee?: number
           default_preparation_minutes?: number
+          delivery_fee_per_km?: number
+          delivery_origin_latitude?: number | null
+          delivery_origin_longitude?: number | null
           delivery_radius_km?: number
           free_delivery_from?: number | null
           minimum_order_amount?: number
@@ -1233,6 +1254,8 @@ export type Database = {
           requested_customer_name: string
           requested_customer_phone: string
           requested_delivery_address: string
+          requested_delivery_latitude: number | null
+          requested_delivery_longitude: number | null
           requested_items: Json
           requested_notes: string
           requested_restaurant_id: string
@@ -1245,6 +1268,13 @@ export type Database = {
           order_token: string
           order_total: number
         }[]
+      }
+      replace_restaurant_business_hours: {
+        Args: {
+          requested_restaurant_id: string
+          requested_schedule: Json
+        }
+        Returns: undefined
       }
       create_public_reservation: {
         Args: {

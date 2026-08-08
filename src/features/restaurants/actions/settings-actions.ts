@@ -30,6 +30,65 @@ function numberValue(formData: FormData, name: string, fallback: number) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+type SubmittedBusinessHour = {
+  day_of_week: number;
+  is_closed: boolean;
+  opens_at: string | null;
+  closes_at: string | null;
+  sort_order: number;
+};
+
+function timeMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function parseBusinessHours(formData: FormData): SubmittedBusinessHour[] {
+  const parsed: unknown = JSON.parse(textValue(formData, "businessHoursJson") || "[]");
+  if (!Array.isArray(parsed)) throw new Error("O horário semanal é inválido.");
+
+  const rows = parsed.map((raw): SubmittedBusinessHour => {
+    if (!raw || typeof raw !== "object") throw new Error("Existe um horário inválido.");
+    const value = raw as Record<string, unknown>;
+    const dayOfWeek = Number(value.day_of_week);
+    const isClosed = value.is_closed === true;
+    const sortOrder = Number(value.sort_order);
+    const opensAt = isClosed ? null : String(value.opens_at ?? "");
+    const closesAt = isClosed ? null : String(value.closes_at ?? "");
+
+    if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) throw new Error("Existe um dia inválido no horário.");
+    if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 3) throw new Error("Existe uma ordem inválida no horário.");
+    if (!isClosed && (!/^\d{2}:\d{2}$/.test(opensAt ?? "") || !/^\d{2}:\d{2}$/.test(closesAt ?? "") || opensAt === closesAt)) {
+      throw new Error("Todos os períodos abertos precisam de hora inicial e final diferentes.");
+    }
+
+    return { day_of_week: dayOfWeek, is_closed: isClosed, opens_at: opensAt, closes_at: closesAt, sort_order: sortOrder };
+  });
+
+  for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek += 1) {
+    const dayRows = rows.filter((row) => row.day_of_week === dayOfWeek);
+    if (!dayRows.length || dayRows.length > 4) throw new Error("Configure todos os dias com até quatro horários.");
+    if (dayRows.some((row) => row.is_closed)) {
+      if (dayRows.length !== 1) throw new Error("Um dia fechado não pode ter horários abertos.");
+      continue;
+    }
+
+    const intervals = dayRows
+      .map((row) => {
+        const start = timeMinutes(row.opens_at!);
+        let end = timeMinutes(row.closes_at!);
+        if (end <= start) end += 24 * 60;
+        return { start, end };
+      })
+      .sort((a, b) => a.start - b.start);
+    if (intervals.some((interval, index) => index > 0 && interval.start < intervals[index - 1].end)) {
+      throw new Error("Existem horários sobrepostos no mesmo dia.");
+    }
+  }
+
+  return rows;
+}
+
 async function uploadBrandingImage(
   formData: FormData,
   field: "logoFile" | "coverFile",
@@ -138,6 +197,24 @@ export async function updateRestaurantSettingsAction(
     }
 
     if (operationSectionPresent) {
+      const deliveryOriginLatitude = textValue(formData, "deliveryOriginLatitude");
+      const deliveryOriginLongitude = textValue(formData, "deliveryOriginLongitude");
+      const deliveryFeePerKm = Math.max(0, numberValue(formData, "deliveryFeePerKm", 0));
+      if ((deliveryOriginLatitude === "") !== (deliveryOriginLongitude === "")) {
+        return { ok: false, message: "Defina novamente a localização de partida das entregas." };
+      }
+      if (deliveryFeePerKm > 0 && !deliveryOriginLatitude) {
+        return { ok: false, message: "Use a localização atual do restaurante antes de ativar o preço por quilómetro." };
+      }
+      const parsedLatitude = deliveryOriginLatitude === "" ? null : Number(deliveryOriginLatitude);
+      const parsedLongitude = deliveryOriginLongitude === "" ? null : Number(deliveryOriginLongitude);
+      if (
+        (parsedLatitude !== null && (!Number.isFinite(parsedLatitude) || parsedLatitude < -90 || parsedLatitude > 90))
+        || (parsedLongitude !== null && (!Number.isFinite(parsedLongitude) || parsedLongitude < -180 || parsedLongitude > 180))
+      ) {
+        return { ok: false, message: "A localização de partida das entregas é inválida." };
+      }
+
       Object.assign(settingsUpdates, {
         delivery_radius_km: Math.max(
           0,
@@ -151,6 +228,9 @@ export async function updateRestaurantSettingsAction(
           0,
           numberValue(formData, "defaultDeliveryFee", 0),
         ),
+        delivery_fee_per_km: deliveryFeePerKm,
+        delivery_origin_latitude: parsedLatitude,
+        delivery_origin_longitude: parsedLongitude,
         free_delivery_from:
           textValue(formData, "freeDeliveryFrom") === ""
             ? null
@@ -210,16 +290,11 @@ export async function updateRestaurantSettingsAction(
     }
 
     if (hoursSectionPresent) {
-      const hours = Array.from({ length: 7 }, (_, dayOfWeek) => ({
-        restaurant_id: restaurantId,
-        day_of_week: dayOfWeek,
-        is_closed: formData.get(`day-${dayOfWeek}-open`) !== "on",
-        opens_at: textValue(formData, `day-${dayOfWeek}-opens`) || null,
-        closes_at: textValue(formData, `day-${dayOfWeek}-closes`) || null,
-      }));
-      const { error: hoursError } = await supabase
-        .from("business_hours")
-        .upsert(hours, { onConflict: "restaurant_id,day_of_week" });
+      const hours = parseBusinessHours(formData);
+      const { error: hoursError } = await supabase.rpc("replace_restaurant_business_hours", {
+        requested_restaurant_id: restaurantId,
+        requested_schedule: hours,
+      });
       if (hoursError) throw new Error(hoursError.message);
     }
 

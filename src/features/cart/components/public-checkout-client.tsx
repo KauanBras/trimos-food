@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { ArrowLeft, LoaderCircle, LocateFixed, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -27,10 +27,26 @@ type Props = {
   settings: {
     minimumOrderAmount: number;
     defaultDeliveryFee: number;
+    deliveryFeePerKm: number;
+    deliveryRadiusKm: number;
+    deliveryOriginLatitude: number | null;
+    deliveryOriginLongitude: number | null;
     freeDeliveryFrom: number | null;
     defaultPreparationMinutes: number;
   };
 };
+
+type DeliveryLocation = { latitude: number; longitude: number };
+
+function distanceInKilometers(origin: DeliveryLocation, destination: DeliveryLocation) {
+  const radians = (degrees: number) => degrees * Math.PI / 180;
+  const latitudeDelta = radians(destination.latitude - origin.latitude);
+  const longitudeDelta = radians(destination.longitude - origin.longitude);
+  const value = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(radians(origin.latitude)) * Math.cos(radians(destination.latitude))
+    * Math.sin(longitudeDelta / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(value)));
+}
 
 export function PublicCheckoutClient({ restaurant, settings }: Props) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -39,6 +55,9 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
     restaurant.acceptsDelivery ? "delivery" : "pickup",
   );
   const [submitting, setSubmitting] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation | null>(null);
   const router = useRouter();
   const money = useMemo(
     () =>
@@ -59,10 +78,22 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
     (total, item) => total + item.unitPrice * item.quantity,
     0,
   );
+  const restaurantLocation = settings.deliveryOriginLatitude !== null
+    && settings.deliveryOriginLongitude !== null
+    ? { latitude: settings.deliveryOriginLatitude, longitude: settings.deliveryOriginLongitude }
+    : null;
+  const deliveryDistance = restaurantLocation && deliveryLocation
+    ? distanceInKilometers(restaurantLocation, deliveryLocation)
+    : null;
+  const outsideDeliveryRadius = deliveryDistance !== null
+    && settings.deliveryRadiusKm > 0
+    && deliveryDistance > settings.deliveryRadiusKm;
+  const calculatedDeliveryFee = settings.defaultDeliveryFee
+    + (deliveryDistance ?? 0) * settings.deliveryFeePerKm;
   const deliveryFee =
     orderType === "delivery" &&
     (settings.freeDeliveryFrom === null || subtotal < settings.freeDeliveryFrom)
-      ? settings.defaultDeliveryFee
+      ? Math.round(calculatedDeliveryFee * 100) / 100
       : 0;
   const total = subtotal + deliveryFee;
   const minimumReached = subtotal >= settings.minimumOrderAmount;
@@ -82,9 +113,36 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
     save(items.map((item) => (item.id === id ? { ...item, notes } : item)));
   }
 
+  function locateDelivery() {
+    if (!("geolocation" in navigator)) {
+      setLocationError("Este dispositivo não suporta localização.");
+      return;
+    }
+    setLocating(true);
+    setLocationError("");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setDeliveryLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        setLocating(false);
+      },
+      () => {
+        setLocating(false);
+        setLocationError("Autorize a localização e tente novamente no endereço da entrega.");
+      },
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+    );
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!items.length || !minimumReached) return;
+    if (!items.length || !minimumReached || outsideDeliveryRadius) return;
+    if (orderType === "delivery" && restaurantLocation && !deliveryLocation) {
+      setLocationError("Confirme a localização da entrega antes de continuar.");
+      return;
+    }
     setSubmitting(true);
     const formData = new FormData(event.currentTarget);
     const supabase = createClient();
@@ -98,6 +156,8 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
         orderType === "delivery"
           ? String(formData.get("deliveryAddress") ?? "")
           : "",
+      requested_delivery_latitude: orderType === "delivery" ? deliveryLocation?.latitude ?? null : null,
+      requested_delivery_longitude: orderType === "delivery" ? deliveryLocation?.longitude ?? null : null,
       requested_notes: String(formData.get("orderNotes") ?? ""),
       requested_items: items.map((item) => ({
         productId: item.productId,
@@ -299,7 +359,7 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
                   </label>
                 )}
                 {orderType === "delivery" && (
-                  <div>
+                  <div className="space-y-3">
                     <label className="text-sm font-medium">
                       Morada de entrega
                     </label>
@@ -309,6 +369,30 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
                       name="deliveryAddress"
                       className="mt-2"
                     />
+                    {restaurantLocation ? (
+                      <div className="rounded-xl border border-zinc-200 p-3">
+                        <p className="text-sm font-medium">Confirmar distância</p>
+                        <p className="mt-1 text-xs leading-5 text-zinc-500">
+                          No endereço da entrega, autorize a sua localização. Ela é usada apenas para calcular o raio e a taxa.
+                        </p>
+                        <Button type="button" variant="outline" className="mt-3 w-full gap-2" disabled={locating} onClick={locateDelivery}>
+                          {locating ? <LoaderCircle className="size-4 animate-spin" /> : <LocateFixed className="size-4" />}
+                          {locating ? "A calcular..." : deliveryLocation ? "Recalcular distância" : "Usar localização da entrega"}
+                        </Button>
+                        {deliveryDistance !== null ? (
+                          <p className={`mt-3 rounded-lg p-2 text-sm ${outsideDeliveryRadius ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+                            {outsideDeliveryRadius
+                              ? `Fora do raio de ${settings.deliveryRadiusKm.toFixed(1)} km (${deliveryDistance.toFixed(2)} km).`
+                              : `Distância: ${deliveryDistance.toFixed(2)} km · dentro do raio de entrega.`}
+                          </p>
+                        ) : null}
+                        {locationError ? <p className="mt-2 text-xs text-red-600">{locationError}</p> : null}
+                      </div>
+                    ) : (
+                      <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+                        O restaurante ainda não ativou o cálculo automático da distância. Será aplicada a taxa base.
+                      </p>
+                    )}
                   </div>
                 )}
                 <div>
@@ -324,7 +408,7 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
                   <span>{money.format(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Taxa fixa de entrega</span>
+                  <span>Taxa de entrega</span>
                   <span>{money.format(deliveryFee)}</span>
                 </div>
                 {settings.freeDeliveryFrom !== null &&
@@ -348,7 +432,7 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
                 )}
                 <Button
                   type="submit"
-                  disabled={submitting || !minimumReached || !restaurant.isOpen}
+                  disabled={submitting || !minimumReached || !restaurant.isOpen || outsideDeliveryRadius || (orderType === "delivery" && Boolean(restaurantLocation) && !deliveryLocation)}
                   className="h-12 w-full bg-zinc-950"
                 >
                   {submitting

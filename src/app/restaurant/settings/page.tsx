@@ -14,14 +14,15 @@ export default async function RestaurantSettingsPage() {
       .single(),
     supabase
       .from("restaurant_settings")
-      .select("primary_color, secondary_color, delivery_radius_km, minimum_order_amount, default_delivery_fee, free_delivery_from, default_preparation_minutes, order_sound_enabled, auto_accept_orders, reservation_slot_minutes, reservation_capacity, reservation_advance_days, reservation_duration_minutes, auto_confirm_reservations")
+      .select("primary_color, secondary_color, delivery_radius_km, delivery_fee_per_km, delivery_origin_latitude, delivery_origin_longitude, minimum_order_amount, default_delivery_fee, free_delivery_from, default_preparation_minutes, order_sound_enabled, auto_accept_orders, reservation_slot_minutes, reservation_capacity, reservation_advance_days, reservation_duration_minutes, auto_confirm_reservations")
       .eq("restaurant_id", restaurantId)
       .single(),
     supabase
       .from("business_hours")
-      .select("day_of_week, opens_at, closes_at, is_closed")
+      .select("day_of_week, opens_at, closes_at, is_closed, sort_order")
       .eq("restaurant_id", restaurantId)
-      .order("day_of_week"),
+      .order("day_of_week")
+      .order("sort_order"),
   ]);
 
   if (restaurantResult.error || !restaurantResult.data) {

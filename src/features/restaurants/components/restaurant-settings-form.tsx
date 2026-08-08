@@ -7,11 +7,14 @@ import {
   ExternalLink,
   ImageIcon,
   LoaderCircle,
+  LocateFixed,
   MapPin,
   Palette,
+  Plus,
   Save,
   Settings2,
   Store,
+  Trash2,
   Upload,
   UtensilsCrossed,
 } from "lucide-react";
@@ -49,6 +52,9 @@ type Settings = {
   primary_color: string;
   secondary_color: string;
   delivery_radius_km: number;
+  delivery_fee_per_km: number;
+  delivery_origin_latitude: number | null;
+  delivery_origin_longitude: number | null;
   minimum_order_amount: number;
   default_delivery_fee: number;
   free_delivery_from: number | null;
@@ -67,6 +73,20 @@ type BusinessHour = {
   opens_at: string | null;
   closes_at: string | null;
   is_closed: boolean;
+  sort_order: number;
+};
+
+type DaySchedule = {
+  isOpen: boolean;
+  periods: Array<{ opensAt: string; closesAt: string }>;
+};
+
+type SerializedBusinessHour = {
+  day_of_week: number;
+  is_closed: boolean;
+  opens_at: string | null;
+  closes_at: string | null;
+  sort_order: number;
 };
 
 const dayNames = [
@@ -97,9 +117,51 @@ export function RestaurantSettingsForm({
   const [coverPreview, setCoverPreview] = useState(restaurant.cover_url);
   const [removeLogo, setRemoveLogo] = useState(false);
   const [removeCover, setRemoveCover] = useState(false);
-  const hoursByDay = useMemo(
-    () => new Map(businessHours.map((item) => [item.day_of_week, item])),
-    [businessHours],
+  const [locatingRestaurant, setLocatingRestaurant] = useState(false);
+  const [deliveryOrigin, setDeliveryOrigin] = useState({
+    latitude: settings.delivery_origin_latitude,
+    longitude: settings.delivery_origin_longitude,
+  });
+  const [weeklySchedule, setWeeklySchedule] = useState<DaySchedule[]>(() =>
+    dayNames.map((_, dayOfWeek) => {
+      const dayRows = businessHours
+        .filter((item) => item.day_of_week === dayOfWeek)
+        .sort((a, b) => a.sort_order - b.sort_order);
+      const periods = dayRows
+        .filter((item) => !item.is_closed && item.opens_at && item.closes_at)
+        .map((item) => ({
+          opensAt: timeValue(item.opens_at),
+          closesAt: timeValue(item.closes_at),
+        }));
+
+      return {
+        isOpen: periods.length > 0,
+        periods: periods.length
+          ? periods
+          : [{ opensAt: "12:00", closesAt: "15:00" }],
+      };
+    }),
+  );
+  const serializedSchedule = useMemo<SerializedBusinessHour[]>(
+    () =>
+      weeklySchedule.flatMap<SerializedBusinessHour>((day, dayOfWeek) =>
+        day.isOpen
+          ? day.periods.map((period, sortOrder) => ({
+              day_of_week: dayOfWeek,
+              is_closed: false,
+              opens_at: period.opensAt,
+              closes_at: period.closesAt,
+              sort_order: sortOrder,
+            }))
+          : [{
+              day_of_week: dayOfWeek,
+              is_closed: true,
+              opens_at: null,
+              closes_at: null,
+              sort_order: 0,
+            }],
+      ),
+    [weeklySchedule],
   );
 
   function previewFile(
@@ -130,6 +192,38 @@ export function RestaurantSettingsForm({
     } catch {
       toast.error("Não foi possível copiar o link.");
     }
+  }
+
+  function updateDaySchedule(dayOfWeek: number, updater: (day: DaySchedule) => DaySchedule) {
+    setWeeklySchedule((current) =>
+      current.map((day, index) => index === dayOfWeek ? updater(day) : day),
+    );
+  }
+
+  function captureRestaurantLocation() {
+    if (!("geolocation" in navigator)) {
+      toast.error("Este dispositivo não suporta localização.");
+      return;
+    }
+
+    setLocatingRestaurant(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setDeliveryOrigin({
+          latitude: Number(position.coords.latitude.toFixed(7)),
+          longitude: Number(position.coords.longitude.toFixed(7)),
+        });
+        setLocatingRestaurant(false);
+        toast.success("Localização de partida definida.");
+      },
+      () => {
+        setLocatingRestaurant(false);
+        toast.error("Não foi possível obter a localização.", {
+          description: "Autorize a localização no navegador e tente novamente dentro do restaurante.",
+        });
+      },
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+    );
   }
 
   return (
@@ -339,7 +433,8 @@ export function RestaurantSettingsForm({
               {[
                 ["deliveryRadiusKm", "Raio operacional (km)", settings.delivery_radius_km],
                 ["minimumOrderAmount", "Pedido mínimo (€)", settings.minimum_order_amount],
-                ["defaultDeliveryFee", "Taxa fixa de entrega (€)", settings.default_delivery_fee],
+                ["defaultDeliveryFee", "Taxa base de entrega (€)", settings.default_delivery_fee],
+                ["deliveryFeePerKm", "Preço por quilómetro (€)", settings.delivery_fee_per_km],
                 ["freeDeliveryFrom", "Entrega grátis a partir de (€)", settings.free_delivery_from ?? ""],
                 ["defaultPreparationMinutes", "Preparação padrão (min)", settings.default_preparation_minutes],
               ].map(([name, label, value]) => (
@@ -349,7 +444,7 @@ export function RestaurantSettingsForm({
                 </div>
               ))}
               <p className="text-xs leading-5 text-zinc-500 sm:col-span-2 lg:col-span-3">
-                A taxa é cobrada uma única vez por entrega. O raio serve como limite operacional para a equipa; a validação automática da morada exige uma integração de mapas.
+                Cálculo: taxa base + distância × preço por quilómetro. Pedidos acima do raio máximo são bloqueados automaticamente.
               </p>
               <label className="flex items-center justify-between rounded-2xl border border-zinc-200 p-4 sm:col-span-2 lg:col-span-1">
                 <span className="text-sm font-medium">Som dos pedidos</span>
@@ -359,6 +454,31 @@ export function RestaurantSettingsForm({
                 <span className="text-sm font-medium">Aceitação automática</span>
                 <Switch name="autoAcceptOrders" defaultChecked={settings.auto_accept_orders} />
               </label>
+            </CardContent>
+          </Card>
+
+          <Card className="border-zinc-200 shadow-none">
+            <CardHeader>
+              <CardTitle className="text-lg">Ponto de partida das entregas</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm leading-6 text-zinc-500">
+                Dentro do restaurante, toque no botão e autorize a localização. As coordenadas permitem calcular a distância sem enviar a morada do cliente a serviços externos.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="deliveryOriginLatitude">Latitude</Label>
+                  <Input id="deliveryOriginLatitude" name="deliveryOriginLatitude" type="number" step="0.0000001" value={deliveryOrigin.latitude ?? ""} readOnly />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="deliveryOriginLongitude">Longitude</Label>
+                  <Input id="deliveryOriginLongitude" name="deliveryOriginLongitude" type="number" step="0.0000001" value={deliveryOrigin.longitude ?? ""} readOnly />
+                </div>
+              </div>
+              <Button type="button" variant="outline" className="gap-2" disabled={locatingRestaurant} onClick={captureRestaurantLocation}>
+                {locatingRestaurant ? <LoaderCircle className="size-4 animate-spin" /> : <LocateFixed className="size-4" />}
+                {locatingRestaurant ? "A obter localização..." : "Usar localização atual do restaurante"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -392,19 +512,81 @@ export function RestaurantSettingsForm({
 
         <TabsContent value="hours" keepMounted>
           <input type="hidden" name="hoursSectionPresent" value="true" />
+          <input type="hidden" name="businessHoursJson" value={JSON.stringify(serializedSchedule)} />
           <Card className="border-zinc-200 shadow-none">
             <CardHeader><CardTitle className="text-lg">Horário semanal</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {dayNames.map((day, dayOfWeek) => {
-                const item = hoursByDay.get(dayOfWeek);
+                const daySchedule = weeklySchedule[dayOfWeek];
                 return (
-                  <div key={day} className="grid items-center gap-3 rounded-2xl border border-zinc-200 p-4 sm:grid-cols-[1fr_auto_auto_auto]">
-                    <p className="font-medium">{day}</p>
-                    <label className="flex items-center gap-2 text-sm">
-                      <Switch name={`day-${dayOfWeek}-open`} defaultChecked={!item?.is_closed} /> Aberto
-                    </label>
-                    <Input name={`day-${dayOfWeek}-opens`} type="time" defaultValue={timeValue(item?.opens_at ?? null)} className="w-full sm:w-32" />
-                    <Input name={`day-${dayOfWeek}-closes`} type="time" defaultValue={timeValue(item?.closes_at ?? null)} className="w-full sm:w-32" />
+                  <div key={day} className="space-y-4 rounded-2xl border border-zinc-200 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="font-medium">{day}</p>
+                      <label className="flex items-center gap-2 text-sm">
+                        <Switch
+                          checked={daySchedule.isOpen}
+                          onCheckedChange={(checked) => updateDaySchedule(dayOfWeek, (current) => ({ ...current, isOpen: checked }))}
+                        />
+                        {daySchedule.isOpen ? "Aberto" : "Fechado"}
+                      </label>
+                    </div>
+
+                    {daySchedule.isOpen && (
+                      <div className="space-y-3">
+                        {daySchedule.periods.map((period, periodIndex) => (
+                          <div key={`${dayOfWeek}-${periodIndex}`} className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                            <div className="space-y-2">
+                              <Label>Abre</Label>
+                              <Input
+                                type="time"
+                                value={period.opensAt}
+                                onChange={(event) => updateDaySchedule(dayOfWeek, (current) => ({
+                                  ...current,
+                                  periods: current.periods.map((item, index) => index === periodIndex ? { ...item, opensAt: event.target.value } : item),
+                                }))}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Fecha</Label>
+                              <Input
+                                type="time"
+                                value={period.closesAt}
+                                onChange={(event) => updateDaySchedule(dayOfWeek, (current) => ({
+                                  ...current,
+                                  periods: current.periods.map((item, index) => index === periodIndex ? { ...item, closesAt: event.target.value } : item),
+                                }))}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Remover horário ${periodIndex + 1} de ${day}`}
+                              disabled={daySchedule.periods.length === 1}
+                              onClick={() => updateDaySchedule(dayOfWeek, (current) => ({
+                                ...current,
+                                periods: current.periods.filter((_, index) => index !== periodIndex),
+                              }))}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        ))}
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="gap-2"
+                          disabled={daySchedule.periods.length >= 4}
+                          onClick={() => updateDaySchedule(dayOfWeek, (current) => ({
+                            ...current,
+                            periods: [...current.periods, { opensAt: "18:45", closesAt: "22:30" }],
+                          }))}
+                        >
+                          <Plus className="size-4" /> Adicionar horário
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
