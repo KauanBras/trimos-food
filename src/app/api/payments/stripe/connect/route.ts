@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { getSiteUrl, getStripe } from "@/lib/stripe/server";
+import {
+  getConnectedAccountState,
+  getSiteUrl,
+  getStripe,
+} from "@/lib/stripe/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST() {
@@ -16,7 +20,7 @@ export async function POST() {
     }
 
     const [{ data: restaurant }, { data: settings }] = await Promise.all([
-      supabase.from("restaurants").select("name, email").eq("id", membership.restaurant_id).single(),
+      supabase.from("restaurants").select("name, email, slug").eq("id", membership.restaurant_id).single(),
       supabase.from("restaurant_settings").select("stripe_account_id").eq("restaurant_id", membership.restaurant_id).single(),
     ]);
     if (!restaurant || !settings) return NextResponse.json({ error: "Restaurante não encontrado." }, { status: 404 });
@@ -24,36 +28,79 @@ export async function POST() {
     const stripe = getStripe();
     let accountId = settings.stripe_account_id;
     if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: "standard",
-        country: "PT",
-        email: restaurant.email ?? user.email,
-        business_profile: { name: restaurant.name, product_description: "Pedidos de restauração e entregas" },
-        capabilities: { mb_way_payments: { requested: true } },
+      const contactEmail = restaurant.email ?? user.email;
+      if (!contactEmail) {
+        return NextResponse.json(
+          { error: "Indique um e-mail do restaurante antes de ligar a Stripe." },
+          { status: 400 },
+        );
+      }
+
+      const account = await stripe.v2.core.accounts.create({
+        contact_email: contactEmail,
+        display_name: restaurant.name,
+        dashboard: "full",
+        identity: { country: "PT" },
+        configuration: {
+          merchant: {
+            capabilities: { card_payments: { requested: true } },
+          },
+        },
+        defaults: {
+          currency: "eur",
+          locales: ["pt-PT"],
+          profile: {
+            doing_business_as: restaurant.name,
+            product_description: "Pedidos de restauração e entregas",
+            business_url: `${getSiteUrl()}/r/${restaurant.slug}`,
+          },
+          responsibilities: {
+            fees_collector: "stripe",
+            losses_collector: "stripe",
+          },
+        },
         metadata: { restaurant_id: membership.restaurant_id },
       });
       accountId = account.id;
+
+      try {
+        await stripe.accounts.update(accountId, {
+          capabilities: { mb_way_payments: { requested: true } },
+        });
+      } catch {
+        // Accounts v2 activates compatible local methods as the merchant completes onboarding.
+      }
+
       const { error } = await supabase.from("restaurant_settings")
         .update({ stripe_account_id: accountId }).eq("restaurant_id", membership.restaurant_id);
       if (error) throw new Error(error.message);
     }
 
-    const account = await stripe.accounts.retrieve(accountId);
+    const accountState = await getConnectedAccountState(accountId);
     const { error: syncError } = await supabase.from("restaurant_settings").update({
-      stripe_charges_enabled: account.charges_enabled,
-      stripe_payouts_enabled: account.payouts_enabled,
-      stripe_details_submitted: account.details_submitted,
-      stripe_mb_way_enabled: account.capabilities?.mb_way_payments === "active",
-      stripe_connected_at: account.details_submitted ? new Date().toISOString() : null,
+      stripe_charges_enabled: accountState.chargesEnabled,
+      stripe_payouts_enabled: accountState.payoutsEnabled,
+      stripe_details_submitted: accountState.detailsSubmitted,
+      stripe_mb_way_enabled: accountState.mbWayEnabled,
+      stripe_connected_at: accountState.detailsSubmitted ? new Date().toISOString() : null,
     }).eq("restaurant_id", membership.restaurant_id);
     if (syncError) throw new Error(syncError.message);
 
     const siteUrl = getSiteUrl();
-    const link = await stripe.accountLinks.create({
+    const link = await stripe.v2.core.accountLinks.create({
       account: accountId,
-      refresh_url: `${siteUrl}/restaurant/settings?stripe=refresh`,
-      return_url: `${siteUrl}/api/payments/stripe/connect/return`,
-      type: "account_onboarding",
+      use_case: {
+        type: "account_onboarding",
+        account_onboarding: {
+          configurations: ["merchant"],
+          refresh_url: `${siteUrl}/restaurant/settings?stripe=refresh`,
+          return_url: `${siteUrl}/api/payments/stripe/connect/return`,
+          collection_options: {
+            fields: "eventually_due",
+            future_requirements: "include",
+          },
+        },
+      },
     });
     return NextResponse.json({ url: link.url });
   } catch (error) {
