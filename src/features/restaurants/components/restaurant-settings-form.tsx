@@ -127,6 +127,13 @@ export function RestaurantSettingsForm({
   settings: Settings;
   businessHours: BusinessHour[];
 }) {
+  const stripeReady =
+    settings.stripe_charges_enabled &&
+    settings.stripe_details_submitted &&
+    settings.stripe_mb_way_enabled;
+  const stripeOnboardingComplete = Boolean(
+    settings.stripe_account_id && settings.stripe_details_submitted,
+  );
   const [pending, startTransition] = useTransition();
   const [logoPreview, setLogoPreview] = useState(restaurant.logo_url);
   const [coverPreview, setCoverPreview] = useState(restaurant.cover_url);
@@ -590,16 +597,24 @@ export function RestaurantSettingsForm({
               </label>
               <label className="flex items-center justify-between rounded-2xl border border-zinc-200 p-4">
                 <div><p className="font-medium">MB WAY online</p><p className="text-sm text-zinc-500">O valor entra diretamente na conta Stripe do restaurante.</p></div>
-                <Switch name="acceptsMbWay" defaultChecked={settings.accepts_mb_way} disabled={!settings.stripe_charges_enabled || !settings.stripe_details_submitted || !settings.stripe_mb_way_enabled} />
+                <Switch name="acceptsMbWay" defaultChecked={settings.accepts_mb_way} disabled={!stripeReady} />
               </label>
             </CardContent>
           </Card>
 
-          <Card className={settings.stripe_charges_enabled && settings.stripe_details_submitted && settings.stripe_mb_way_enabled ? "border-emerald-200 bg-emerald-50/50 shadow-none" : "border-zinc-200 shadow-none"}>
+          <Card className={stripeReady ? "border-emerald-200 bg-emerald-50/50 shadow-none" : "border-zinc-200 shadow-none"}>
             <CardHeader><CardTitle className="text-lg">Conta de recebimento</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-2xl bg-white p-4 text-sm">
-                <p className="font-medium">{settings.stripe_charges_enabled && settings.stripe_details_submitted && settings.stripe_mb_way_enabled ? "Stripe e MB WAY prontos" : settings.stripe_account_id ? "Configuração Stripe ou MB WAY incompleta" : "Stripe ainda não ligada"}</p>
+                <p className="font-medium">
+                  {stripeReady
+                    ? "Stripe e MB WAY prontos"
+                    : stripeOnboardingComplete
+                      ? "Stripe ligada; ativação dos pagamentos em processamento"
+                      : settings.stripe_account_id
+                        ? "Configuração Stripe incompleta"
+                        : "Stripe ainda não ligada"}
+                </p>
                 <p className="mt-1 text-zinc-500">Cada restaurante recebe os pagamentos diretamente na própria conta bancária.</p>
               </div>
               <Button type="button" variant="outline" className="gap-2" disabled={connectingStripe} onClick={() => void connectStripe()}>

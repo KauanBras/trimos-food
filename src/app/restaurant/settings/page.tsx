@@ -1,5 +1,6 @@
 import { RestaurantSettingsForm } from "@/features/restaurants/components/restaurant-settings-form";
 import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
+import { getConnectedAccountState } from "@/lib/stripe/server";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function RestaurantSettingsPage() {
@@ -35,6 +36,39 @@ export default async function RestaurantSettingsPage() {
     throw new Error(hoursResult.error.message);
   }
 
+  let currentSettings = settingsResult.data;
+  if (currentSettings.stripe_account_id) {
+    try {
+      const accountState = await getConnectedAccountState(
+        currentSettings.stripe_account_id,
+      );
+      const stripeUpdates = {
+        stripe_charges_enabled: accountState.chargesEnabled,
+        stripe_payouts_enabled: accountState.payoutsEnabled,
+        stripe_details_submitted: accountState.detailsSubmitted,
+        stripe_mb_way_enabled: accountState.mbWayEnabled,
+      };
+      const stripeStateChanged = Object.entries(stripeUpdates).some(
+        ([key, value]) =>
+          currentSettings[key as keyof typeof stripeUpdates] !== value,
+      );
+
+      if (stripeStateChanged) {
+        const { error: stripeSyncError } = await supabase
+          .from("restaurant_settings")
+          .update(stripeUpdates)
+          .eq("restaurant_id", restaurantId);
+        if (!stripeSyncError) {
+          currentSettings = { ...currentSettings, ...stripeUpdates };
+        }
+      } else {
+        currentSettings = { ...currentSettings, ...stripeUpdates };
+      }
+    } catch {
+      // A página continua disponível se a Stripe estiver temporariamente indisponível.
+    }
+  }
+
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <div>
@@ -47,7 +81,7 @@ export default async function RestaurantSettingsPage() {
 
       <RestaurantSettingsForm
         restaurant={restaurantResult.data}
-        settings={settingsResult.data}
+        settings={currentSettings}
         businessHours={hoursResult.data ?? []}
       />
     </div>
