@@ -24,8 +24,8 @@ export async function createRestaurantAction(formData: FormData) {
   ) {
     redirect(
       `/onboarding?error=${encodeURIComponent(
-        "Indique um nome entre 2 e 100 caracteres."
-      )}`
+        "Indique um nome entre 2 e 100 caracteres.",
+      )}`,
     );
   }
 
@@ -35,8 +35,8 @@ export async function createRestaurantAction(formData: FormData) {
   if (!restaurantSlug) {
     redirect(
       `/onboarding?error=${encodeURIComponent(
-        "Não foi possível gerar um endereço válido."
-      )}`
+        "Não foi possível gerar um endereço válido.",
+      )}`,
     );
   }
 
@@ -50,17 +50,27 @@ export async function createRestaurantAction(formData: FormData) {
     redirect("/login");
   }
 
-  const { error } = await supabase.rpc(
+  const { data: restaurantId, error } = await supabase.rpc(
     "create_restaurant_for_current_user",
     {
       restaurant_name: restaurantName,
       restaurant_slug: restaurantSlug,
-    }
+    },
   );
 
   if (error) {
     redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
   }
 
-  redirect("/restaurant/dashboard");
+  if (restaurantId) {
+    await supabase.rpc("record_platform_audit", {
+      requested_restaurant_id: restaurantId,
+      requested_action: "restaurant.created",
+      requested_entity_type: "restaurant",
+      requested_entity_id: restaurantId,
+      requested_metadata: { source: "self_service_onboarding" },
+    });
+  }
+
+  redirect("/restaurant/getting-started");
 }

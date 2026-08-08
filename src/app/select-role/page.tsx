@@ -1,10 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  Bike,
-  ChevronRight,
-  Store,
-} from "lucide-react";
+import { Bike, ChevronRight, Sparkles, Store } from "lucide-react";
 
 import {
   Card,
@@ -30,6 +26,7 @@ export default async function SelectRolePage() {
   const [
     { data: driver, error: driverError },
     { data: membership, error: membershipError },
+    { data: profile, error: profileError },
   ] = await Promise.all([
     supabase
       .from("drivers")
@@ -45,29 +42,47 @@ export default async function SelectRolePage() {
       .eq("user_id", user.id)
       .eq("is_active", true)
       .maybeSingle(),
+
+    supabase
+      .from("profiles")
+      .select("platform_role")
+      .eq("id", user.id)
+      .maybeSingle(),
   ]);
 
   if (driverError) {
     throw new Error(
-      `Não foi possível verificar o perfil de estafeta: ${driverError.message}`
+      `Não foi possível verificar o perfil de estafeta: ${driverError.message}`,
     );
   }
 
   if (membershipError) {
     throw new Error(
-      `Não foi possível verificar o restaurante: ${membershipError.message}`
+      `Não foi possível verificar o restaurante: ${membershipError.message}`,
     );
   }
 
-  if (membership && !driver) {
+  if (profileError) {
+    throw new Error(
+      `Não foi possível verificar o acesso à plataforma: ${profileError.message}`,
+    );
+  }
+
+  const isPlatformAdmin = profile?.platform_role === "super_admin";
+
+  if (membership && !driver && !isPlatformAdmin) {
     redirect("/restaurant/dashboard");
   }
 
-  if (driver && !membership) {
+  if (driver && !membership && !isPlatformAdmin) {
     redirect("/driver/dashboard");
   }
 
-  if (!driver && !membership) {
+  if (isPlatformAdmin && !driver && !membership) {
+    redirect("/admin");
+  }
+
+  if (!driver && !membership && !isPlatformAdmin) {
     redirect("/onboarding");
   }
 
@@ -75,9 +90,7 @@ export default async function SelectRolePage() {
     <main className="flex min-h-screen items-center justify-center bg-zinc-100 p-5">
       <div className="w-full max-w-lg">
         <div className="mb-8 text-center">
-          <p className="text-sm font-medium text-amber-600">
-            Trimos Food
-          </p>
+          <p className="text-sm font-medium text-amber-600">Trimos Food</p>
 
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">
             Como pretende entrar?
@@ -89,55 +102,70 @@ export default async function SelectRolePage() {
         </div>
 
         <div className="space-y-4">
-          <Link
-            href="/restaurant/dashboard"
-            className="block"
-          >
-            <Card className="group border-zinc-200 bg-white shadow-sm transition hover:border-zinc-400 hover:shadow-md">
-              <CardHeader className="flex flex-row items-center gap-4">
-                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white">
-                  <Store className="size-6" />
-                </div>
+          {isPlatformAdmin ? (
+            <Link href="/admin" className="block">
+              <Card className="group border-amber-200 bg-amber-50 shadow-sm transition hover:border-amber-400 hover:shadow-md">
+                <CardHeader className="flex flex-row items-center gap-4">
+                  <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-amber-400 text-zinc-950">
+                    <Sparkles className="size-6" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-xl">
+                      Administração Trimos
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      Restaurantes, planos, faturação e auditoria.
+                    </CardDescription>
+                  </div>
+                  <ChevronRight className="size-5 text-amber-600 transition group-hover:translate-x-1" />
+                </CardHeader>
+              </Card>
+            </Link>
+          ) : null}
 
-                <div className="min-w-0 flex-1">
-                  <CardTitle className="text-xl">
-                    Restaurante
-                  </CardTitle>
+          {membership ? (
+            <Link href="/restaurant/dashboard" className="block">
+              <Card className="group border-zinc-200 bg-white shadow-sm transition hover:border-zinc-400 hover:shadow-md">
+                <CardHeader className="flex flex-row items-center gap-4">
+                  <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-zinc-950 text-white">
+                    <Store className="size-6" />
+                  </div>
 
-                  <CardDescription className="mt-1">
-                    Pedidos, cozinha, produtos, reservas e gestão.
-                  </CardDescription>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-xl">Restaurante</CardTitle>
 
-                <ChevronRight className="size-5 text-zinc-400 transition group-hover:translate-x-1 group-hover:text-zinc-950" />
-              </CardHeader>
-            </Card>
-          </Link>
+                    <CardDescription className="mt-1">
+                      Pedidos, cozinha, produtos, reservas e gestão.
+                    </CardDescription>
+                  </div>
 
-          <Link
-            href="/driver/dashboard"
-            className="block"
-          >
-            <Card className="group border-zinc-200 bg-white shadow-sm transition hover:border-amber-400 hover:shadow-md">
-              <CardHeader className="flex flex-row items-center gap-4">
-                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-amber-400 text-zinc-950">
-                  <Bike className="size-6" />
-                </div>
+                  <ChevronRight className="size-5 text-zinc-400 transition group-hover:translate-x-1 group-hover:text-zinc-950" />
+                </CardHeader>
+              </Card>
+            </Link>
+          ) : null}
 
-                <div className="min-w-0 flex-1">
-                  <CardTitle className="text-xl">
-                    Estafeta
-                  </CardTitle>
+          {driver ? (
+            <Link href="/driver/dashboard" className="block">
+              <Card className="group border-zinc-200 bg-white shadow-sm transition hover:border-amber-400 hover:shadow-md">
+                <CardHeader className="flex flex-row items-center gap-4">
+                  <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-amber-400 text-zinc-950">
+                    <Bike className="size-6" />
+                  </div>
 
-                  <CardDescription className="mt-1">
-                    Receber ofertas e gerir as suas entregas.
-                  </CardDescription>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-xl">Estafeta</CardTitle>
 
-                <ChevronRight className="size-5 text-zinc-400 transition group-hover:translate-x-1 group-hover:text-amber-600" />
-              </CardHeader>
-            </Card>
-          </Link>
+                    <CardDescription className="mt-1">
+                      Receber ofertas e gerir as suas entregas.
+                    </CardDescription>
+                  </div>
+
+                  <ChevronRight className="size-5 text-zinc-400 transition group-hover:translate-x-1 group-hover:text-amber-600" />
+                </CardHeader>
+              </Card>
+            </Link>
+          ) : null}
         </div>
 
         <Card className="mt-6 border-dashed bg-transparent shadow-none">

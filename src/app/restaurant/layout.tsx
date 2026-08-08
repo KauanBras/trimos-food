@@ -33,28 +33,38 @@ export default async function RestaurantLayout({
   }
 
   const restaurant = membership.restaurants;
-  const [{ data: profile }, { data: settings }, { data: businessHours }, newOrders] =
-    await Promise.all([
-      supabase
-        .from("profiles")
-        .select("full_name, avatar_url")
-        .eq("id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("restaurant_settings")
-        .select("order_sound_enabled")
-        .eq("restaurant_id", membership.restaurant_id)
-        .maybeSingle(),
-      supabase
-        .from("business_hours")
-        .select("day_of_week, opens_at, closes_at, is_closed")
-        .eq("restaurant_id", membership.restaurant_id),
-      supabase
-        .from("orders")
-        .select("id", { count: "exact", head: true })
-        .eq("restaurant_id", membership.restaurant_id)
-        .eq("status", "new"),
-    ]);
+  const [
+    { data: profile },
+    { data: settings },
+    { data: businessHours },
+    newOrders,
+    { data: onboarding },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, avatar_url, platform_role")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("restaurant_settings")
+      .select("order_sound_enabled")
+      .eq("restaurant_id", membership.restaurant_id)
+      .maybeSingle(),
+    supabase
+      .from("business_hours")
+      .select("day_of_week, opens_at, closes_at, is_closed")
+      .eq("restaurant_id", membership.restaurant_id),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("restaurant_id", membership.restaurant_id)
+      .eq("status", "new"),
+    supabase
+      .from("restaurant_onboarding")
+      .select("progress_percent")
+      .eq("restaurant_id", membership.restaurant_id)
+      .maybeSingle(),
+  ]);
 
   const operatingStatus = getRestaurantOperatingStatus(
     businessHours ?? [],
@@ -75,6 +85,8 @@ export default async function RestaurantLayout({
     userAvatarUrl: profile?.avatar_url ?? null,
     role: membership.role,
     newOrderCount: newOrders.count ?? 0,
+    onboardingProgress: onboarding?.progress_percent ?? 0,
+    isPlatformAdmin: profile?.platform_role === "super_admin",
   };
 
   return (

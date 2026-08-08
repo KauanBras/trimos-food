@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BadgeCheck,
   BarChart3,
   Bike,
   CalendarDays,
@@ -16,6 +17,7 @@ import {
   Sparkles,
   Store,
   Users,
+  WalletCards,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -51,6 +53,8 @@ type RestaurantSidebarProps = {
   userAvatarUrl: string | null;
   role: string;
   newOrderCount: number;
+  onboardingProgress?: number;
+  isPlatformAdmin?: boolean;
   mobile?: boolean;
 };
 
@@ -72,6 +76,8 @@ export function RestaurantSidebar({
   userAvatarUrl,
   role,
   newOrderCount,
+  onboardingProgress = 100,
+  isPlatformAdmin = false,
   mobile = false,
 }: RestaurantSidebarProps) {
   const pathname = usePathname();
@@ -89,7 +95,10 @@ export function RestaurantSidebar({
           className="flex w-full items-center gap-3 rounded-2xl p-2 text-left outline-none transition hover:bg-zinc-100"
         >
           <Avatar className="size-11 shrink-0 rounded-2xl border border-zinc-200">
-            <AvatarImage src={restaurantLogoUrl ?? undefined} alt={restaurantName} />
+            <AvatarImage
+              src={restaurantLogoUrl ?? undefined}
+              alt={restaurantName}
+            />
             <AvatarFallback className="rounded-2xl bg-zinc-950 text-white">
               <Store className="size-5" />
             </AvatarFallback>
@@ -121,6 +130,21 @@ export function RestaurantSidebar({
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
+        {onboardingProgress < 100 ? (
+          <Link
+            href="/restaurant/getting-started"
+            className={cn(
+              "mb-3 flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-medium transition",
+              pathname === "/restaurant/getting-started"
+                ? "border-amber-400 bg-amber-400 text-zinc-950"
+                : "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100",
+            )}
+          >
+            <BadgeCheck className="size-[18px]" />
+            <span className="flex-1">Primeiros passos</span>
+            <span className="text-xs">{onboardingProgress}%</span>
+          </Link>
+        ) : null}
         {navigation.map((item) => {
           const Icon = item.icon;
           const active =
@@ -188,6 +212,24 @@ export function RestaurantSidebar({
       </div>
 
       <div className="border-t border-zinc-200 p-3">
+        <Link
+          href="/restaurant/billing"
+          className="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950"
+        >
+          <WalletCards className="size-[18px] text-zinc-400" />
+          Plano e faturação
+        </Link>
+
+        {isPlatformAdmin ? (
+          <Link
+            href="/admin"
+            className="mb-1 flex items-center gap-3 rounded-xl bg-zinc-950 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800"
+          >
+            <Sparkles className="size-[18px] text-amber-400" />
+            Administração Trimos
+          </Link>
+        ) : null}
+
         <Link
           href="/restaurant/settings"
           className="mb-2 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950"

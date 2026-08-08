@@ -26,6 +26,8 @@ type RestaurantTopbarProps = {
   userAvatarUrl: string | null;
   role: string;
   newOrderCount: number;
+  onboardingProgress?: number;
+  isPlatformAdmin?: boolean;
 };
 
 function initials(value: string) {
@@ -57,7 +59,10 @@ export function RestaurantTopbar(props: RestaurantTopbarProps) {
           </SheetContent>
         </Sheet>
 
-        <form action="/restaurant/search" className="relative hidden max-w-md flex-1 md:block">
+        <form
+          action="/restaurant/search"
+          className="relative hidden max-w-md flex-1 md:block"
+        >
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
           <Input
             name="q"
@@ -96,7 +101,9 @@ export function RestaurantTopbar(props: RestaurantTopbarProps) {
           </Button>
 
           <Button
-            render={<Link href="/restaurant/orders" aria-label="Ver novos pedidos" />}
+            render={
+              <Link href="/restaurant/orders" aria-label="Ver novos pedidos" />
+            }
             nativeButton={false}
             variant="outline"
             size="icon"
@@ -109,7 +116,10 @@ export function RestaurantTopbar(props: RestaurantTopbarProps) {
           </Button>
 
           <Avatar className="hidden size-9 sm:flex">
-            <AvatarImage src={props.userAvatarUrl ?? undefined} alt={props.userName} />
+            <AvatarImage
+              src={props.userAvatarUrl ?? undefined}
+              alt={props.userName}
+            />
             <AvatarFallback className="bg-zinc-950 text-xs text-white">
               {initials(props.userName) || "U"}
             </AvatarFallback>

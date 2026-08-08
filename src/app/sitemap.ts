@@ -17,7 +17,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     {
       url: siteUrl,
       changeFrequency: "monthly",
-      priority: 0.5,
+      priority: 1,
+    },
+    {
+      url: `${siteUrl}/pricing`,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${siteUrl}/contact`,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${siteUrl}/terms`,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${siteUrl}/privacy`,
+      changeFrequency: "yearly",
+      priority: 0.3,
     },
     ...(restaurants ?? []).map((restaurant) => ({
       url: `${siteUrl}/r/${restaurant.slug}`,

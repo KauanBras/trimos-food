@@ -77,7 +77,9 @@ test("checkout permite terminal e dinheiro com indicação de troco", async ({
   await page.goto(`/r/${restaurantSlug}/carrinho`);
 
   await expect(page.getByText("Pagamento", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Terminal no levantamento|Levar terminal/)).toBeVisible();
+  await expect(
+    page.getByText(/Terminal no levantamento|Levar terminal/),
+  ).toBeVisible();
   await page.getByText("Dinheiro", { exact: true }).click();
   await expect(page.getByLabel("Precisa de troco para quanto?")).toBeVisible();
   expect(runtimeErrors).toEqual([]);
@@ -105,6 +107,9 @@ test("áreas privadas exigem autenticação", async ({ page }) => {
   await expect(page).toHaveURL(/\/login/);
 
   await page.goto("/driver/dashboard");
+  await expect(page).toHaveURL(/\/login/);
+
+  await page.goto("/admin");
   await expect(page).toHaveURL(/\/login/);
 });
 

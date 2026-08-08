@@ -35,9 +35,35 @@ test("robots protege áreas privadas e publica o sitemap", async ({
 
   expect(robots).toContain("Disallow: /restaurant/");
   expect(robots).toContain("Disallow: /driver/");
+  expect(robots).toContain("Disallow: /admin/");
   expect(robots).toContain("Sitemap:");
 
   const sitemapResponse = await request.get("/sitemap.xml");
   const sitemap = await sitemapResponse.text();
   expect(sitemap).toContain("/r/hirotatsu-sushi");
+  expect(sitemap).toContain("/pricing");
+});
+
+test("vitrine comercial apresenta produto, preços e contacto", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", {
+      name: "O restaurante inteiro, a funcionar num só lugar.",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Começar", exact: true }),
+  ).toBeVisible();
+
+  await page.goto("/pricing");
+  await expect(
+    page.getByRole("heading", { name: "Um plano para cada fase." }),
+  ).toBeVisible();
+
+  await page.goto("/contact");
+  await expect(
+    page.getByRole("heading", { name: "Pedir demonstração" }),
+  ).toBeVisible();
 });
