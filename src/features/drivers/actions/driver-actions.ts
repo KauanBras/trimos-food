@@ -71,9 +71,23 @@ export async function updateDriverProfileAction(formData: FormData) {
   const phone = String(formData.get("phone") ?? "").trim();
   const vehicleType = String(formData.get("vehicleType") ?? "").trim();
   const vehiclePlate = String(formData.get("vehiclePlate") ?? "").trim().toUpperCase();
+  const networkEnabled = formData.get("networkEnabled") === "on";
+  const networkRadiusKm = Math.min(100, Math.max(1, Number(formData.get("networkRadiusKm") ?? 10)));
+  const payoutMethod = String(formData.get("payoutMethod") ?? "mb_way");
+  const payoutPhone = String(formData.get("payoutPhone") ?? "").trim();
+  const payoutIban = String(formData.get("payoutIban") ?? "").replace(/\s+/g, "").toUpperCase();
 
   if (fullName.length < 2 || phone.length < 6) {
     redirect("/driver/perfil?error=Preencha%20o%20nome%20e%20o%20telefone.");
+  }
+  if (!["mb_way", "bank_transfer", "cash"].includes(payoutMethod)) {
+    redirect("/driver/perfil?error=Escolha%20uma%20forma%20de%20recebimento%20válida.");
+  }
+  if (payoutMethod === "mb_way" && payoutPhone.length < 6) {
+    redirect("/driver/perfil?error=Indique%20o%20telefone%20MB%20WAY.");
+  }
+  if (payoutMethod === "bank_transfer" && payoutIban.length < 15) {
+    redirect("/driver/perfil?error=Indique%20um%20IBAN%20válido.");
   }
 
   const { error: profileError } = await supabase
@@ -90,6 +104,12 @@ export async function updateDriverProfileAction(formData: FormData) {
       phone,
       vehicle_type: vehicleType || null,
       vehicle_plate: vehiclePlate || null,
+      is_network_enabled: networkEnabled,
+      network_enabled_at: networkEnabled ? new Date().toISOString() : null,
+      network_radius_km: networkRadiusKm,
+      payout_method: payoutMethod as "mb_way" | "bank_transfer" | "cash",
+      payout_phone: payoutPhone || null,
+      payout_iban: payoutIban || null,
     })
     .eq("user_id", user.id)
     .eq("is_active", true);

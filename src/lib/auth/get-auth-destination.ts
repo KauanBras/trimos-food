@@ -17,6 +17,7 @@ export async function getAuthDestination(
       .select("id, is_active")
       .eq("user_id", userId)
       .eq("is_active", true)
+      .limit(1)
       .maybeSingle(),
 
     supabase

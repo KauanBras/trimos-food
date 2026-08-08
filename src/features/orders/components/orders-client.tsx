@@ -31,6 +31,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { updateRestaurantOrderStatusAction } from "@/features/orders/actions/order-actions";
 import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/database";
 import type { Json } from "@/types/database";
@@ -57,6 +58,9 @@ export type RestaurantOrder = {
   subtotal: number;
   delivery_fee: number;
   total: number;
+  payment_method: Database["public"]["Enums"]["payment_method"];
+  payment_status: Database["public"]["Enums"]["payment_status"];
+  cash_tendered_amount: number | null;
   estimated_minutes: number | null;
   created_at: string;
   order_items: OrderItem[];
@@ -76,6 +80,11 @@ const statusConfig: Record<
     icon: typeof ShoppingBag;
   }
 > = {
+  pending_payment: {
+    label: "Aguarda pagamento",
+    className: "border-violet-200 bg-violet-50 text-violet-700",
+    icon: Clock3,
+  },
   new: {
     label: "Novo pedido",
     className: "border-red-200 bg-red-50 text-red-700",
@@ -166,6 +175,9 @@ export function OrdersClient({
         subtotal,
         delivery_fee,
         total,
+        payment_method,
+        payment_status,
+        cash_tendered_amount,
         estimated_minutes,
         created_at,
         order_items (
@@ -206,6 +218,8 @@ export function OrdersClient({
             return;
           }
 
+          if (order.status === "pending_payment") return;
+
           setOrders((current) => [
             order,
             ...current.filter((item) => item.id !== order.id),
@@ -232,9 +246,12 @@ export function OrdersClient({
             return;
           }
 
-          setOrders((current) =>
-            current.map((item) => (item.id === order.id ? order : item))
-          );
+          setOrders((current) => {
+            if (order.status === "pending_payment") return current.filter((item) => item.id !== order.id);
+            return current.some((item) => item.id === order.id)
+              ? current.map((item) => (item.id === order.id ? order : item))
+              : [order, ...current];
+          });
         }
       )
       .subscribe();
@@ -248,33 +265,17 @@ export function OrdersClient({
     orderId: string,
     status: DatabaseOrderStatus
   ) {
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        status,
-        accepted_at:
-          status === "confirmed" || status === "preparing"
-            ? new Date().toISOString()
-            : undefined,
-        ready_at: status === "ready" ? new Date().toISOString() : undefined,
-        completed_at:
-          status === "completed" ? new Date().toISOString() : undefined,
-        cancelled_at:
-          status === "cancelled" ? new Date().toISOString() : undefined,
-      })
-      .eq("id", orderId)
-      .eq("restaurant_id", restaurantId);
-
-    if (error) {
+    const result = await updateRestaurantOrderStatusAction(orderId, status);
+    if (!result.ok) {
       toast.error("Não foi possível atualizar o pedido", {
-        description: error.message,
+        description: result.message,
       });
       return;
     }
 
     setOrders((current) =>
       current.map((order) =>
-        order.id === orderId ? { ...order, status } : order
+        order.id === orderId ? { ...order, status, payment_status: result.paymentStatus ?? order.payment_status } : order
       )
     );
   }
@@ -356,6 +357,18 @@ export function OrdersClient({
                       {" · "}
                       {formatCreatedAt(order.created_at)}
                     </p>
+
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                      <Badge variant="outline">
+                        {order.payment_method === "mb_way" ? "MB WAY" : order.payment_method === "terminal" ? "Terminal" : "Dinheiro"}
+                        {order.payment_status === "paid" ? " · Pago" : order.payment_status === "refunded" ? " · Reembolsado" : " · A receber"}
+                      </Badge>
+                      {order.payment_method === "cash" && order.cash_tendered_amount !== null ? (
+                        <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">
+                          Troco: {formatMoney(Math.max(0, order.cash_tendered_amount - order.total), currencyCode)}
+                        </Badge>
+                      ) : null}
+                    </div>
 
                     <div className="mt-4 space-y-1.5">
                       {order.order_items.map((item) => (
@@ -441,14 +454,12 @@ export function OrdersClient({
                       )}
 
                     {order.status === "awaiting_driver" && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          updateStatus(order.id, "out_for_delivery")
-                        }
+                      <Badge
+                        variant="outline"
+                        className="h-9 border-violet-200 bg-violet-50 px-3 text-violet-700"
                       >
-                        Estafeta recolheu
-                      </Button>
+                        A aguardar aceitação ou recolha
+                      </Badge>
                     )}
 
                     {order.status === "out_for_delivery" && (

@@ -36,6 +36,7 @@ export default async function SelectRolePage() {
       .select("id")
       .eq("user_id", user.id)
       .eq("is_active", true)
+      .limit(1)
       .maybeSingle(),
 
     supabase

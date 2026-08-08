@@ -14,7 +14,7 @@ export default async function RestaurantSettingsPage() {
       .single(),
     supabase
       .from("restaurant_settings")
-      .select("primary_color, secondary_color, delivery_radius_km, delivery_fee_per_km, delivery_origin_latitude, delivery_origin_longitude, minimum_order_amount, default_delivery_fee, free_delivery_from, default_preparation_minutes, order_sound_enabled, auto_accept_orders, reservation_slot_minutes, reservation_capacity, reservation_advance_days, reservation_duration_minutes, auto_confirm_reservations")
+      .select("primary_color, secondary_color, delivery_radius_km, delivery_fee_per_km, delivery_origin_latitude, delivery_origin_longitude, minimum_order_amount, default_delivery_fee, free_delivery_from, default_preparation_minutes, order_sound_enabled, auto_accept_orders, reservation_slot_minutes, reservation_capacity, reservation_advance_days, reservation_duration_minutes, auto_confirm_reservations, accepts_cash, accepts_terminal, accepts_mb_way, stripe_account_id, stripe_charges_enabled, stripe_payouts_enabled, stripe_details_submitted, stripe_mb_way_enabled, driver_pool_mode, driver_fee_base, driver_fee_per_km")
       .eq("restaurant_id", restaurantId)
       .single(),
     supabase

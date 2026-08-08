@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Clock3, LoaderCircle, PackageCheck, Truck, XCircle } from "lucide-react";
 
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
@@ -18,6 +18,9 @@ export type PublicOrderSummary = {
   deliveryFee: number;
   total: number;
   estimatedMinutes: number | null;
+  paymentMethod: "cash" | "terminal" | "mb_way";
+  paymentStatus: "pending" | "awaiting_collection" | "paid" | "failed" | "refunded" | "cancelled";
+  cashTenderedAmount: number | null;
   items: Array<{
     productName: string;
     variantName: string | null;
@@ -29,6 +32,7 @@ export type PublicOrderSummary = {
 };
 
 const statusCopy: Record<string, { title: string; description: string; tone: string }> = {
+  pending_payment: { title: "A aguardar pagamento", description: "Confirme o pedido na aplicação MB WAY.", tone: "bg-violet-50 text-violet-900" },
   new: { title: "Pedido recebido", description: "A aguardar aceitação do restaurante.", tone: "bg-amber-50 text-amber-900" },
   confirmed: { title: "Pedido aceite", description: "A equipa confirmou o seu pedido.", tone: "bg-blue-50 text-blue-900" },
   preparing: { title: "Em preparação", description: "A cozinha já está a preparar o pedido.", tone: "bg-amber-50 text-amber-900" },
@@ -51,12 +55,28 @@ export function PublicOrderStatus({
   currencyCode: string;
 }) {
   const [order, setOrder] = useState(initialOrder);
+  const [startingPayment, setStartingPayment] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const money = useMemo(
     () => new Intl.NumberFormat("pt-PT", { style: "currency", currency: currencyCode }),
     [currencyCode],
   );
   const copy = statusCopy[order.status] ?? statusCopy.new;
+
+  async function retryMbWay() {
+    setStartingPayment(true);
+    const response = await fetch("/api/payments/stripe/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ orderId: order.id, token }),
+    });
+    const result = (await response.json()) as { url?: string };
+    if (response.ok && result.url) {
+      window.location.assign(result.url);
+      return;
+    }
+    setStartingPayment(false);
+  }
 
   useEffect(() => {
     if (["completed", "cancelled"].includes(order.status)) return;
@@ -71,14 +91,14 @@ export function PublicOrderStatus({
     return () => window.clearInterval(interval);
   }, [order.id, order.status, supabase, token]);
 
-  const StatusIcon = order.status === "cancelled" ? XCircle : order.status === "out_for_delivery" ? Truck : ["ready", "completed"].includes(order.status) ? PackageCheck : order.status === "new" ? LoaderCircle : CheckCircle2;
+  const StatusIcon = order.status === "cancelled" ? XCircle : order.status === "out_for_delivery" ? Truck : ["ready", "completed"].includes(order.status) ? PackageCheck : ["new", "pending_payment"].includes(order.status) ? LoaderCircle : CheckCircle2;
 
   return (
     <main className="min-h-screen bg-zinc-50 p-4 py-10">
       <Card className="mx-auto max-w-2xl shadow-none">
         <CardContent className="space-y-6 p-6 sm:p-8">
           <div className="text-center">
-            <StatusIcon className={`mx-auto size-14 ${order.status === "new" ? "animate-pulse text-amber-500" : order.status === "cancelled" ? "text-red-500" : "text-emerald-500"}`} />
+            <StatusIcon className={`mx-auto size-14 ${["new", "pending_payment"].includes(order.status) ? "animate-pulse text-amber-500" : order.status === "cancelled" ? "text-red-500" : "text-emerald-500"}`} />
             <h1 className="mt-4 text-3xl font-semibold">{copy.title}</h1>
             <p className="mt-2 text-zinc-500">{copy.description}</p>
             <p className="mt-3 font-mono text-sm">#{order.id.slice(0, 6).toUpperCase()}</p>
@@ -86,6 +106,26 @@ export function PublicOrderStatus({
 
           <div className={`flex items-center justify-center gap-2 rounded-2xl p-4 ${copy.tone}`}>
             <Clock3 className="size-5" /> Tempo estimado: {order.estimatedMinutes ?? 30} minutos
+          </div>
+
+          <div className="rounded-2xl border p-4 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-zinc-500">Pagamento</span>
+              <span className="font-medium">
+                {order.paymentMethod === "mb_way" ? "MB WAY" : order.paymentMethod === "terminal" ? "Terminal" : "Dinheiro"}
+                {order.paymentStatus === "paid" ? " · Pago" : order.paymentStatus === "awaiting_collection" ? " · No recebimento" : " · Pendente"}
+              </span>
+            </div>
+            {order.paymentMethod === "cash" && order.cashTenderedAmount !== null ? (
+              <p className="mt-2 text-zinc-600">
+                Troco para {money.format(order.cashTenderedAmount)}: {money.format(Math.max(0, order.cashTenderedAmount - order.total))}
+              </p>
+            ) : null}
+            {order.status === "pending_payment" ? (
+              <Button type="button" className="mt-4 w-full" disabled={startingPayment} onClick={() => void retryMbWay()}>
+                {startingPayment ? "A abrir MB WAY..." : "Continuar pagamento MB WAY"}
+              </Button>
+            ) : null}
           </div>
 
           <div className="space-y-3">

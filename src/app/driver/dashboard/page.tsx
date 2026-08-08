@@ -69,16 +69,24 @@ export default async function DriverDashboardPage({
       status,
       delivery_address,
       delivery_fee,
+      driver_fee,
+      assignment_source,
       distance_km,
       offer_expires_at,
       created_at,
       orders (
         customer_name,
         customer_phone,
-        total
+        total,
+        payment_method,
+        payment_status,
+        cash_tendered_amount
+      ),
+      restaurants (
+        name,
+        currency_code
       )
     `)
-    .eq("restaurant_id", restaurantId)
     .in("status", [
       "searching_driver",
       "offered",
@@ -104,12 +112,6 @@ export default async function DriverDashboardPage({
     );
   }
 
-  const { data: restaurant } = await supabase
-    .from("restaurants")
-    .select("currency_code")
-    .eq("id", restaurantId)
-    .maybeSingle();
-
   return (
     <div className="space-y-5">
       <DriverPushSetup
@@ -120,13 +122,11 @@ export default async function DriverDashboardPage({
 
       <DriverDashboardClient
         driverId={driver.id}
-        restaurantId={restaurantId}
         initialStatus={driver.status}
         initialDeliveries={deliveries ?? []}
         initialRejectedDeliveryIds={
           rejections?.map((item) => item.delivery_id) ?? []
         }
-        currencyCode={restaurant?.currency_code ?? "EUR"}
       />
     </div>
   );

@@ -22,10 +22,17 @@ export async function getCurrentDriver() {
       vehicle_type,
       vehicle_plate,
       phone,
-      is_active
+      is_active,
+      is_network_enabled,
+      network_radius_km,
+      payout_method,
+      payout_phone,
+      payout_iban
     `)
     .eq("user_id", user.id)
     .eq("is_active", true)
+    .order("created_at")
+    .limit(1)
     .maybeSingle();
 
   if (error) {

@@ -44,7 +44,7 @@ serve(async (request) => {
       .eq("id", deliveryId)
       .eq("status", "offered")
       .is("push_notified_at", null)
-      .select("id, order_id, offered_driver_id")
+      .select("id, order_id, offered_driver_id, driver_fee")
       .maybeSingle();
 
     if (claimError) throw claimError;
@@ -83,13 +83,13 @@ serve(async (request) => {
       throw restaurantError ?? new Error("Restaurant unavailable");
     }
 
-    const amount = new Intl.NumberFormat("pt-PT", {
+    const earning = new Intl.NumberFormat("pt-PT", {
       style: "currency",
       currency: restaurant.currency_code ?? "EUR",
-    }).format(Number(order.total));
+    }).format(Number(delivery.driver_fee));
     const notification = JSON.stringify({
       title: `Nova entrega · ${restaurant.name}`,
-      body: `${order.customer_name} · ${amount}`,
+      body: `${order.customer_name} · ganha ${earning}`,
       url: "/driver/dashboard",
       tag: `delivery-${delivery.id}`,
     });

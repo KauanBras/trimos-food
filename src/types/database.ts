@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.15"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       business_hours: {
@@ -149,6 +174,9 @@ export type Database = {
       deliveries: {
         Row: {
           accepted_at: string | null
+          assignment_source:
+            | Database["public"]["Enums"]["driver_assignment_source"]
+            | null
           cancelled_at: string | null
           created_at: string
           delivered_at: string | null
@@ -156,6 +184,7 @@ export type Database = {
           delivery_fee: number
           dispatch_attempts: number
           distance_km: number | null
+          driver_fee: number
           driver_id: string | null
           id: string
           offer_expires_at: string | null
@@ -171,6 +200,9 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string | null
+          assignment_source?:
+            | Database["public"]["Enums"]["driver_assignment_source"]
+            | null
           cancelled_at?: string | null
           created_at?: string
           delivered_at?: string | null
@@ -178,6 +210,7 @@ export type Database = {
           delivery_fee?: number
           dispatch_attempts?: number
           distance_km?: number | null
+          driver_fee?: number
           driver_id?: string | null
           id?: string
           offer_expires_at?: string | null
@@ -193,6 +226,9 @@ export type Database = {
         }
         Update: {
           accepted_at?: string | null
+          assignment_source?:
+            | Database["public"]["Enums"]["driver_assignment_source"]
+            | null
           cancelled_at?: string | null
           created_at?: string
           delivered_at?: string | null
@@ -200,6 +236,7 @@ export type Database = {
           delivery_fee?: number
           dispatch_attempts?: number
           distance_km?: number | null
+          driver_fee?: number
           driver_id?: string | null
           id?: string
           offer_expires_at?: string | null
@@ -280,6 +317,99 @@ export type Database = {
           },
         ]
       }
+      driver_earnings: {
+        Row: {
+          cash_collected: number
+          created_at: string
+          delivery_id: string
+          driver_fee: number
+          driver_id: string
+          id: string
+          net_balance: number
+          order_id: string
+          order_total: number
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          restaurant_id: string
+          settled_at: string | null
+          settled_by: string | null
+          settlement_reference: string | null
+          status: Database["public"]["Enums"]["driver_earning_status"]
+          updated_at: string
+        }
+        Insert: {
+          cash_collected?: number
+          created_at?: string
+          delivery_id: string
+          driver_fee: number
+          driver_id: string
+          id?: string
+          net_balance: number
+          order_id: string
+          order_total: number
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          restaurant_id: string
+          settled_at?: string | null
+          settled_by?: string | null
+          settlement_reference?: string | null
+          status?: Database["public"]["Enums"]["driver_earning_status"]
+          updated_at?: string
+        }
+        Update: {
+          cash_collected?: number
+          created_at?: string
+          delivery_id?: string
+          driver_fee?: number
+          driver_id?: string
+          id?: string
+          net_balance?: number
+          order_id?: string
+          order_total?: number
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          restaurant_id?: string
+          settled_at?: string | null
+          settled_by?: string | null
+          settlement_reference?: string | null
+          status?: Database["public"]["Enums"]["driver_earning_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_earnings_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: true
+            referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_earnings_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_earnings_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_earnings_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_earnings_settled_by_fkey"
+            columns: ["settled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_invites: {
         Row: {
           accepted_at: string | null
@@ -345,7 +475,13 @@ export type Database = {
           current_longitude: number | null
           id: string
           is_active: boolean
+          is_network_enabled: boolean
           location_updated_at: string | null
+          network_enabled_at: string | null
+          network_radius_km: number
+          payout_iban: string | null
+          payout_method: Database["public"]["Enums"]["driver_payout_method"]
+          payout_phone: string | null
           phone: string | null
           restaurant_id: string
           status: Database["public"]["Enums"]["driver_status"]
@@ -360,7 +496,13 @@ export type Database = {
           current_longitude?: number | null
           id?: string
           is_active?: boolean
+          is_network_enabled?: boolean
           location_updated_at?: string | null
+          network_enabled_at?: string | null
+          network_radius_km?: number
+          payout_iban?: string | null
+          payout_method?: Database["public"]["Enums"]["driver_payout_method"]
+          payout_phone?: string | null
           phone?: string | null
           restaurant_id: string
           status?: Database["public"]["Enums"]["driver_status"]
@@ -375,7 +517,13 @@ export type Database = {
           current_longitude?: number | null
           id?: string
           is_active?: boolean
+          is_network_enabled?: boolean
           location_updated_at?: string | null
+          network_enabled_at?: string | null
+          network_radius_km?: number
+          payout_iban?: string | null
+          payout_method?: Database["public"]["Enums"]["driver_payout_method"]
+          payout_phone?: string | null
           phone?: string | null
           restaurant_id?: string
           status?: Database["public"]["Enums"]["driver_status"]
@@ -397,6 +545,94 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      modifier_groups: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          max_selections: number
+          min_selections: number
+          name: string
+          restaurant_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_selections?: number
+          min_selections?: number
+          name: string
+          restaurant_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_selections?: number
+          min_selections?: number
+          name?: string
+          restaurant_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modifier_groups_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      modifier_options: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          max_quantity: number
+          modifier_group_id: string
+          name: string
+          price_delta: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_quantity?: number
+          modifier_group_id: string
+          name: string
+          price_delta?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_quantity?: number
+          modifier_group_id?: string
+          name?: string
+          price_delta?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_modifier_options_modifier_group_id_fkey"
+            columns: ["modifier_group_id"]
+            isOneToOne: false
+            referencedRelation: "modifier_groups"
             referencedColumns: ["id"]
           },
         ]
@@ -498,6 +734,7 @@ export type Database = {
         Row: {
           accepted_at: string | null
           cancelled_at: string | null
+          cash_tendered_amount: number | null
           completed_at: string | null
           created_at: string
           customer_email: string | null
@@ -512,8 +749,17 @@ export type Database = {
           estimated_minutes: number | null
           id: string
           notes: string | null
+          paid_at: string | null
+          payment_attempts: number
+          payment_failure_reason: string | null
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          payment_provider: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          provider_checkout_session_id: string | null
+          provider_payment_id: string | null
           public_token: string
           ready_at: string | null
+          refunded_at: string | null
           restaurant_id: string
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
@@ -524,6 +770,7 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           cancelled_at?: string | null
+          cash_tendered_amount?: number | null
           completed_at?: string | null
           created_at?: string
           customer_email?: string | null
@@ -538,8 +785,17 @@ export type Database = {
           estimated_minutes?: number | null
           id?: string
           notes?: string | null
+          paid_at?: string | null
+          payment_attempts?: number
+          payment_failure_reason?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          payment_provider?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          provider_checkout_session_id?: string | null
+          provider_payment_id?: string | null
           public_token?: string
           ready_at?: string | null
+          refunded_at?: string | null
           restaurant_id: string
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
@@ -550,6 +806,7 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           cancelled_at?: string | null
+          cash_tendered_amount?: number | null
           completed_at?: string | null
           created_at?: string
           customer_email?: string | null
@@ -564,8 +821,17 @@ export type Database = {
           estimated_minutes?: number | null
           id?: string
           notes?: string | null
+          paid_at?: string | null
+          payment_attempts?: number
+          payment_failure_reason?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          payment_provider?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          provider_checkout_session_id?: string | null
+          provider_payment_id?: string | null
           public_token?: string
           ready_at?: string | null
+          refunded_at?: string | null
           restaurant_id?: string
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
@@ -586,6 +852,83 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_modifier_groups: {
+        Row: {
+          modifier_group_id: string
+          product_id: string
+          sort_order: number
+        }
+        Insert: {
+          modifier_group_id: string
+          product_id: string
+          sort_order?: number
+        }
+        Update: {
+          modifier_group_id?: string
+          product_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_modifier_groups_modifier_group_id_fkey"
+            columns: ["modifier_group_id"]
+            isOneToOne: false
+            referencedRelation: "modifier_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_modifier_groups_product_id_fkey1"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_variants: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          is_available: boolean
+          name: string
+          price: number
+          product_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_available?: boolean
+          name: string
+          price: number
+          product_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_available?: boolean
+          name?: string
+          price?: number
+          product_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variants_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -652,139 +995,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      modifier_groups: {
-        Row: {
-          created_at: string
-          id: string
-          is_active: boolean
-          max_selections: number
-          min_selections: number
-          name: string
-          restaurant_id: string
-          sort_order: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          max_selections?: number
-          min_selections?: number
-          name: string
-          restaurant_id: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          max_selections?: number
-          min_selections?: number
-          name?: string
-          restaurant_id?: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "modifier_groups_restaurant_id_fkey"
-            columns: ["restaurant_id"]
-            isOneToOne: false
-            referencedRelation: "restaurants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      modifier_options: {
-        Row: {
-          created_at: string
-          id: string
-          is_active: boolean
-          modifier_group_id: string
-          max_quantity: number
-          name: string
-          price_delta: number
-          sort_order: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          modifier_group_id: string
-          max_quantity?: number
-          name: string
-          price_delta?: number
-          sort_order?: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          modifier_group_id?: string
-          max_quantity?: number
-          name?: string
-          price_delta?: number
-          sort_order?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "modifier_options_modifier_group_id_fkey"
-            columns: ["modifier_group_id"]
-            isOneToOne: false
-            referencedRelation: "modifier_groups"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      product_modifier_groups: {
-        Row: { modifier_group_id: string; product_id: string; sort_order: number }
-        Insert: { modifier_group_id: string; product_id: string; sort_order?: number }
-        Update: { modifier_group_id?: string; product_id?: string; sort_order?: number }
-        Relationships: [
-          { foreignKeyName: "product_modifier_groups_modifier_group_id_fkey"; columns: ["modifier_group_id"]; isOneToOne: false; referencedRelation: "modifier_groups"; referencedColumns: ["id"] },
-          { foreignKeyName: "product_modifier_groups_product_id_fkey"; columns: ["product_id"]; isOneToOne: false; referencedRelation: "products"; referencedColumns: ["id"] },
-        ]
-      }
-      product_variants: {
-        Row: {
-          created_at: string
-          id: string
-          is_active: boolean
-          is_available: boolean
-          name: string
-          price: number
-          product_id: string
-          sort_order: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          is_available?: boolean
-          name: string
-          price: number
-          product_id: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          is_available?: boolean
-          name?: string
-          price?: number
-          product_id?: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Relationships: [{ foreignKeyName: "product_variants_product_id_fkey"; columns: ["product_id"]; isOneToOne: false; referencedRelation: "products"; referencedColumns: ["id"] }]
       }
       profiles: {
         Row: {
@@ -974,8 +1184,66 @@ export type Database = {
           },
         ]
       }
+      restaurant_drivers: {
+        Row: {
+          added_by: string | null
+          created_at: string
+          driver_id: string
+          id: string
+          is_active: boolean
+          is_preferred: boolean
+          restaurant_id: string
+          updated_at: string
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string
+          driver_id: string
+          id?: string
+          is_active?: boolean
+          is_preferred?: boolean
+          restaurant_id: string
+          updated_at?: string
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string
+          driver_id?: string
+          id?: string
+          is_active?: boolean
+          is_preferred?: boolean
+          restaurant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_drivers_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restaurant_drivers_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restaurant_drivers_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       restaurant_settings: {
         Row: {
+          accepts_cash: boolean
+          accepts_mb_way: boolean
+          accepts_terminal: boolean
           auto_accept_orders: boolean
           auto_confirm_reservations: boolean
           created_at: string
@@ -985,6 +1253,9 @@ export type Database = {
           delivery_origin_latitude: number | null
           delivery_origin_longitude: number | null
           delivery_radius_km: number
+          driver_fee_base: number | null
+          driver_fee_per_km: number | null
+          driver_pool_mode: Database["public"]["Enums"]["driver_pool_mode"]
           free_delivery_from: number | null
           minimum_order_amount: number
           order_sound_enabled: boolean
@@ -995,9 +1266,18 @@ export type Database = {
           reservation_slot_minutes: number
           restaurant_id: string
           secondary_color: string
+          stripe_account_id: string | null
+          stripe_charges_enabled: boolean
+          stripe_connected_at: string | null
+          stripe_details_submitted: boolean
+          stripe_mb_way_enabled: boolean
+          stripe_payouts_enabled: boolean
           updated_at: string
         }
         Insert: {
+          accepts_cash?: boolean
+          accepts_mb_way?: boolean
+          accepts_terminal?: boolean
           auto_accept_orders?: boolean
           auto_confirm_reservations?: boolean
           created_at?: string
@@ -1007,6 +1287,9 @@ export type Database = {
           delivery_origin_latitude?: number | null
           delivery_origin_longitude?: number | null
           delivery_radius_km?: number
+          driver_fee_base?: number | null
+          driver_fee_per_km?: number | null
+          driver_pool_mode?: Database["public"]["Enums"]["driver_pool_mode"]
           free_delivery_from?: number | null
           minimum_order_amount?: number
           order_sound_enabled?: boolean
@@ -1017,9 +1300,18 @@ export type Database = {
           reservation_slot_minutes?: number
           restaurant_id: string
           secondary_color?: string
+          stripe_account_id?: string | null
+          stripe_charges_enabled?: boolean
+          stripe_connected_at?: string | null
+          stripe_details_submitted?: boolean
+          stripe_mb_way_enabled?: boolean
+          stripe_payouts_enabled?: boolean
           updated_at?: string
         }
         Update: {
+          accepts_cash?: boolean
+          accepts_mb_way?: boolean
+          accepts_terminal?: boolean
           auto_accept_orders?: boolean
           auto_confirm_reservations?: boolean
           created_at?: string
@@ -1029,6 +1321,9 @@ export type Database = {
           delivery_origin_latitude?: number | null
           delivery_origin_longitude?: number | null
           delivery_radius_km?: number
+          driver_fee_base?: number | null
+          driver_fee_per_km?: number | null
+          driver_pool_mode?: Database["public"]["Enums"]["driver_pool_mode"]
           free_delivery_from?: number | null
           minimum_order_amount?: number
           order_sound_enabled?: boolean
@@ -1039,6 +1334,12 @@ export type Database = {
           reservation_slot_minutes?: number
           restaurant_id?: string
           secondary_color?: string
+          stripe_account_id?: string | null
+          stripe_charges_enabled?: boolean
+          stripe_connected_at?: string | null
+          stripe_details_submitted?: boolean
+          stripe_mb_way_enabled?: boolean
+          stripe_payouts_enabled?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -1196,9 +1497,21 @@ export type Database = {
         Returns: string
       }
       activate_current_user_as_driver: { Args: never; Returns: string }
-      complete_delivery: {
-        Args: { requested_delivery_id: string }
-        Returns: undefined
+      attach_stripe_checkout_session: {
+        Args: {
+          requested_order_id: string
+          requested_order_token: string
+          requested_session_id: string
+        }
+        Returns: boolean
+      }
+      calculate_driver_fee: {
+        Args: {
+          requested_delivery_fee: number
+          requested_distance_km: number
+          requested_restaurant_id: string
+        }
+        Returns: number
       }
       cancel_public_reservation: {
         Args: {
@@ -1207,60 +1520,30 @@ export type Database = {
         }
         Returns: boolean
       }
+      complete_delivery: {
+        Args: { requested_delivery_id: string }
+        Returns: undefined
+      }
+      confirm_delivery_payment: {
+        Args: { requested_delivery_id: string }
+        Returns: undefined
+      }
       create_delivery_for_order: {
         Args: { requested_order_id: string }
         Returns: string
       }
-      create_restaurant_for_current_user: {
-        Args: { restaurant_name: string; restaurant_slug: string }
-        Returns: string
-      }
-      dispatch_next_driver: {
-        Args: { requested_delivery_id: string }
-        Returns: string
-      }
-      expire_my_delivery_offer: {
-        Args: { requested_delivery_id: string }
-        Returns: boolean
-      }
-      has_restaurant_role: {
-        Args: {
-          allowed_roles: Database["public"]["Enums"]["restaurant_role"][]
-          requested_restaurant_id: string
-        }
-        Returns: boolean
-      }
-      is_restaurant_member: {
-        Args: { requested_restaurant_id: string }
-        Returns: boolean
-      }
-      is_super_admin: { Args: never; Returns: boolean }
-      pick_up_delivery: {
-        Args: { requested_delivery_id: string }
-        Returns: undefined
-      }
-      process_expired_delivery_offers: { Args: never; Returns: number }
-      reject_delivery: {
-        Args: { requested_delivery_id: string }
-        Returns: undefined
-      }
-      reorder_restaurant_products: {
-        Args: {
-          requested_product_ids: string[]
-          requested_restaurant_id: string
-        }
-        Returns: undefined
-      }
       create_public_order: {
         Args: {
+          requested_cash_tendered_amount: number
           requested_customer_email: string
           requested_customer_name: string
           requested_customer_phone: string
           requested_delivery_address: string
-          requested_delivery_latitude: number | null
-          requested_delivery_longitude: number | null
+          requested_delivery_latitude: number
+          requested_delivery_longitude: number
           requested_items: Json
           requested_notes: string
+          requested_payment_method: Database["public"]["Enums"]["payment_method"]
           requested_restaurant_id: string
           requested_type: Database["public"]["Enums"]["order_type"]
         }
@@ -1271,13 +1554,6 @@ export type Database = {
           order_token: string
           order_total: number
         }[]
-      }
-      replace_restaurant_business_hours: {
-        Args: {
-          requested_restaurant_id: string
-          requested_schedule: Json
-        }
-        Returns: undefined
       }
       create_public_reservation: {
         Args: {
@@ -1296,7 +1572,26 @@ export type Database = {
           reservation_token: string
         }[]
       }
-      get_public_checkout_settings: { Args: { requested_restaurant_id: string }; Returns: Json }
+      create_restaurant_for_current_user: {
+        Args: { restaurant_name: string; restaurant_slug: string }
+        Returns: string
+      }
+      dispatch_next_driver: {
+        Args: { requested_delivery_id: string }
+        Returns: string
+      }
+      expire_my_delivery_offer: {
+        Args: { requested_delivery_id: string }
+        Returns: boolean
+      }
+      get_public_checkout_settings: {
+        Args: { requested_restaurant_id: string }
+        Returns: Json
+      }
+      get_public_order_status: {
+        Args: { requested_order_id: string; requested_order_token: string }
+        Returns: Json
+      }
       get_public_reservation_settings: {
         Args: { requested_restaurant_id: string }
         Returns: {
@@ -1304,13 +1599,91 @@ export type Database = {
           reservation_slot_minutes: number
         }[]
       }
-      get_public_order_status: { Args: { requested_order_id: string; requested_order_token: string }; Returns: Json }
       get_public_reservation_status: {
         Args: {
           requested_reservation_id: string
           requested_reservation_token: string
         }
         Returns: Json
+      }
+      get_stripe_checkout_order: {
+        Args: { requested_order_id: string; requested_order_token: string }
+        Returns: Json
+      }
+      has_restaurant_role: {
+        Args: {
+          allowed_roles: Database["public"]["Enums"]["restaurant_role"][]
+          requested_restaurant_id: string
+        }
+        Returns: boolean
+      }
+      is_restaurant_member: {
+        Args: { requested_restaurant_id: string }
+        Returns: boolean
+      }
+      is_restaurant_open_at: {
+        Args: {
+          requested_local_timestamp: string
+          requested_restaurant_id: string
+        }
+        Returns: boolean
+      }
+      is_restaurant_reservation_slot: {
+        Args: {
+          requested_date: string
+          requested_restaurant_id: string
+          requested_slot_minutes: number
+          requested_time: string
+        }
+        Returns: boolean
+      }
+      is_super_admin: { Args: never; Returns: boolean }
+      pick_up_delivery: {
+        Args: { requested_delivery_id: string }
+        Returns: undefined
+      }
+      process_expired_delivery_offers: { Args: never; Returns: number }
+      record_stripe_payment: {
+        Args: {
+          requested_account_id: string
+          requested_failure_reason?: string
+          requested_payment_id: string
+          requested_session_id: string
+          requested_succeeded: boolean
+        }
+        Returns: string
+      }
+      reject_delivery: {
+        Args: { requested_delivery_id: string }
+        Returns: undefined
+      }
+      reorder_restaurant_products: {
+        Args: {
+          requested_product_ids: string[]
+          requested_restaurant_id: string
+        }
+        Returns: undefined
+      }
+      replace_restaurant_business_hours: {
+        Args: { requested_restaurant_id: string; requested_schedule: Json }
+        Returns: undefined
+      }
+      settle_driver_earnings: {
+        Args: {
+          requested_earning_ids: string[]
+          requested_reference: string
+          requested_restaurant_id: string
+        }
+        Returns: number
+      }
+      upsert_customer_for_contact: {
+        Args: {
+          requested_email: string
+          requested_name: string
+          requested_phone: string
+          requested_restaurant_id: string
+        }
+        Returns: string
       }
     }
     Enums: {
@@ -1321,8 +1694,13 @@ export type Database = {
         | "picked_up"
         | "delivered"
         | "cancelled"
+      driver_assignment_source: "private" | "network"
+      driver_earning_status: "pending" | "settled" | "cancelled"
+      driver_payout_method: "mb_way" | "bank_transfer" | "cash"
+      driver_pool_mode: "private" | "network" | "hybrid"
       driver_status: "offline" | "available" | "busy" | "suspended"
       order_status:
+        | "pending_payment"
         | "new"
         | "confirmed"
         | "preparing"
@@ -1332,6 +1710,14 @@ export type Database = {
         | "completed"
         | "cancelled"
       order_type: "delivery" | "pickup" | "dine_in"
+      payment_method: "cash" | "terminal" | "mb_way"
+      payment_status:
+        | "pending"
+        | "awaiting_collection"
+        | "paid"
+        | "failed"
+        | "refunded"
+        | "cancelled"
       platform_role: "user" | "super_admin"
       reservation_source: "public" | "dashboard" | "phone" | "walk_in"
       reservation_status:
@@ -1474,6 +1860,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       delivery_status: [
@@ -1484,8 +1873,13 @@ export const Constants = {
         "delivered",
         "cancelled",
       ],
+      driver_assignment_source: ["private", "network"],
+      driver_earning_status: ["pending", "settled", "cancelled"],
+      driver_payout_method: ["mb_way", "bank_transfer", "cash"],
+      driver_pool_mode: ["private", "network", "hybrid"],
       driver_status: ["offline", "available", "busy", "suspended"],
       order_status: [
+        "pending_payment",
         "new",
         "confirmed",
         "preparing",
@@ -1496,7 +1890,25 @@ export const Constants = {
         "cancelled",
       ],
       order_type: ["delivery", "pickup", "dine_in"],
+      payment_method: ["cash", "terminal", "mb_way"],
+      payment_status: [
+        "pending",
+        "awaiting_collection",
+        "paid",
+        "failed",
+        "refunded",
+        "cancelled",
+      ],
       platform_role: ["user", "super_admin"],
+      reservation_source: ["public", "dashboard", "phone", "walk_in"],
+      reservation_status: [
+        "pending",
+        "confirmed",
+        "seated",
+        "completed",
+        "cancelled",
+        "no_show",
+      ],
       restaurant_role: [
         "owner",
         "admin",

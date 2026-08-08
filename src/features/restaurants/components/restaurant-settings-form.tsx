@@ -16,6 +16,8 @@ import {
   Save,
   Settings2,
   Store,
+  WalletCards,
+  Bike,
   Trash2,
   Upload,
   UtensilsCrossed,
@@ -68,6 +70,17 @@ type Settings = {
   reservation_advance_days: number;
   reservation_duration_minutes: number;
   auto_confirm_reservations: boolean;
+  accepts_cash: boolean;
+  accepts_terminal: boolean;
+  accepts_mb_way: boolean;
+  stripe_account_id: string | null;
+  stripe_charges_enabled: boolean;
+  stripe_payouts_enabled: boolean;
+  stripe_details_submitted: boolean;
+  stripe_mb_way_enabled: boolean;
+  driver_pool_mode: "private" | "network" | "hybrid";
+  driver_fee_base: number | null;
+  driver_fee_per_km: number | null;
 };
 
 type BusinessHour = {
@@ -120,6 +133,7 @@ export function RestaurantSettingsForm({
   const [removeLogo, setRemoveLogo] = useState(false);
   const [removeCover, setRemoveCover] = useState(false);
   const [locatingRestaurant, setLocatingRestaurant] = useState(false);
+  const [connectingStripe, setConnectingStripe] = useState(false);
   const [deliveryOrigin, setDeliveryOrigin] = useState({
     latitude: settings.delivery_origin_latitude,
     longitude: settings.delivery_origin_longitude,
@@ -219,6 +233,21 @@ export function RestaurantSettingsForm({
       toast.success("Link do menu copiado.");
     } catch {
       toast.error("Não foi possível copiar o link.");
+    }
+  }
+
+  async function connectStripe() {
+    setConnectingStripe(true);
+    try {
+      const response = await fetch("/api/payments/stripe/connect", { method: "POST" });
+      const result = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !result.url) throw new Error(result.error ?? "Não foi possível iniciar a ligação.");
+      window.location.assign(result.url);
+    } catch (error) {
+      setConnectingStripe(false);
+      toast.error("Não foi possível ligar a Stripe", {
+        description: error instanceof Error ? error.message : undefined,
+      });
     }
   }
 
@@ -322,6 +351,9 @@ export function RestaurantSettingsForm({
           </TabsTrigger>
           <TabsTrigger value="operation" className="gap-2">
             <Settings2 className="size-4" /> Operação
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="gap-2">
+            <WalletCards className="size-4" /> Pagamentos
           </TabsTrigger>
           <TabsTrigger value="reservations" className="gap-2">
             <UtensilsCrossed className="size-4" /> Reservas
@@ -539,6 +571,64 @@ export function RestaurantSettingsForm({
                 {locatingRestaurant ? <LoaderCircle className="size-4 animate-spin" /> : <LocateFixed className="size-4" />}
                 {locatingRestaurant ? "A obter localização..." : "Usar localização atual do restaurante"}
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payments" keepMounted className="space-y-6">
+          <input type="hidden" name="paymentsSectionPresent" value="true" />
+          <Card className="border-zinc-200 shadow-none">
+            <CardHeader><CardTitle className="text-lg">Métodos aceites</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <label className="flex items-center justify-between rounded-2xl border border-zinc-200 p-4">
+                <div><p className="font-medium">Dinheiro</p><p className="text-sm text-zinc-500">O cliente pode indicar o valor para o troco.</p></div>
+                <Switch name="acceptsCash" defaultChecked={settings.accepts_cash} />
+              </label>
+              <label className="flex items-center justify-between rounded-2xl border border-zinc-200 p-4">
+                <div><p className="font-medium">Terminal na entrega ou levantamento</p><p className="text-sm text-zinc-500">Cartão ou MB WAY através do terminal do restaurante.</p></div>
+                <Switch name="acceptsTerminal" defaultChecked={settings.accepts_terminal} />
+              </label>
+              <label className="flex items-center justify-between rounded-2xl border border-zinc-200 p-4">
+                <div><p className="font-medium">MB WAY online</p><p className="text-sm text-zinc-500">O valor entra diretamente na conta Stripe do restaurante.</p></div>
+                <Switch name="acceptsMbWay" defaultChecked={settings.accepts_mb_way} disabled={!settings.stripe_charges_enabled || !settings.stripe_details_submitted || !settings.stripe_mb_way_enabled} />
+              </label>
+            </CardContent>
+          </Card>
+
+          <Card className={settings.stripe_charges_enabled && settings.stripe_details_submitted && settings.stripe_mb_way_enabled ? "border-emerald-200 bg-emerald-50/50 shadow-none" : "border-zinc-200 shadow-none"}>
+            <CardHeader><CardTitle className="text-lg">Conta de recebimento</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-2xl bg-white p-4 text-sm">
+                <p className="font-medium">{settings.stripe_charges_enabled && settings.stripe_details_submitted && settings.stripe_mb_way_enabled ? "Stripe e MB WAY prontos" : settings.stripe_account_id ? "Configuração Stripe ou MB WAY incompleta" : "Stripe ainda não ligada"}</p>
+                <p className="mt-1 text-zinc-500">Cada restaurante recebe os pagamentos diretamente na própria conta bancária.</p>
+              </div>
+              <Button type="button" variant="outline" className="gap-2" disabled={connectingStripe} onClick={() => void connectStripe()}>
+                {connectingStripe ? <LoaderCircle className="size-4 animate-spin" /> : <WalletCards className="size-4" />}
+                {settings.stripe_account_id ? "Continuar configuração Stripe" : "Ligar conta Stripe"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-zinc-200 shadow-none">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Bike className="size-5" /> Estafetas e remuneração</CardTitle></CardHeader>
+            <CardContent className="grid gap-5 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="driverPoolMode">Quem pode receber as entregas</Label>
+                <select id="driverPoolMode" name="driverPoolMode" defaultValue={settings.driver_pool_mode} className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm">
+                  <option value="private">Apenas estafetas convidados</option>
+                  <option value="network">Apenas rede Trimos</option>
+                  <option value="hybrid">Próprios primeiro, depois rede Trimos</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="driverFeeBase">Ganho base do estafeta (€)</Label>
+                <Input id="driverFeeBase" name="driverFeeBase" type="number" min="0" step="0.01" defaultValue={settings.driver_fee_base ?? ""} placeholder="Igual à taxa cobrada" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="driverFeePerKm">Ganho por quilómetro (€)</Label>
+                <Input id="driverFeePerKm" name="driverFeePerKm" type="number" min="0" step="0.01" defaultValue={settings.driver_fee_per_km ?? ""} placeholder="Igual à taxa cobrada" />
+              </div>
+              <p className="text-xs leading-5 text-zinc-500 sm:col-span-2">Se os dois valores ficarem vazios, o estafeta recebe o valor completo da taxa de entrega cobrada ao cliente. A oferta mostra o ganho antes da aceitação.</p>
             </CardContent>
           </Card>
         </TabsContent>

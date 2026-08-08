@@ -17,6 +17,9 @@ export default async function OrdersPage() {
       subtotal,
       delivery_fee,
       total,
+      payment_method,
+      payment_status,
+      cash_tendered_amount,
       estimated_minutes,
       created_at,
       order_items (
@@ -30,6 +33,7 @@ export default async function OrdersPage() {
       )
     `)
     .eq("restaurant_id", restaurantId)
+    .neq("status", "pending_payment")
     .order("created_at", { ascending: false });
 
   if (error) {

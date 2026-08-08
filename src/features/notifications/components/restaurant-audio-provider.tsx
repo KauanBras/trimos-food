@@ -159,6 +159,7 @@ export function RestaurantAudioProvider({
           filter: `restaurant_id=eq.${restaurantId}`,
         },
         (payload) => {
+          if (payload.new.status !== "new") return;
           if ("Notification" in window && Notification.permission === "granted") {
             const orderId = String(payload.new.id ?? "novo");
             const notification = new Notification("Novo pedido recebido", {

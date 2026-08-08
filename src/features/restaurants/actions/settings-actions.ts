@@ -144,6 +144,7 @@ export async function updateRestaurantSettingsAction(
     const identitySectionPresent = formData.has("identitySectionPresent");
     const operationSectionPresent = formData.has("operationSectionPresent");
     const reservationsSectionPresent = formData.has("reservationsSectionPresent");
+    const paymentsSectionPresent = formData.has("paymentsSectionPresent");
     const hoursSectionPresent = formData.has("hoursSectionPresent");
 
     if (identitySectionPresent) {
@@ -278,6 +279,42 @@ export async function updateRestaurantSettingsAction(
         ),
         auto_confirm_reservations:
           formData.get("autoConfirmReservations") === "on",
+      });
+    }
+
+    if (paymentsSectionPresent) {
+      const acceptsCash = formData.get("acceptsCash") === "on";
+      const acceptsTerminal = formData.get("acceptsTerminal") === "on";
+      const wantsMbWay = formData.get("acceptsMbWay") === "on";
+      if (!acceptsCash && !acceptsTerminal && !wantsMbWay) {
+        return { ok: false, message: "Ative pelo menos uma forma de pagamento." };
+      }
+      const driverPoolMode = textValue(formData, "driverPoolMode");
+      if (!["private", "network", "hybrid"].includes(driverPoolMode)) {
+        return { ok: false, message: "Escolha uma modalidade válida para os estafetas." };
+      }
+      const driverFeeBase = textValue(formData, "driverFeeBase");
+      const driverFeePerKm = textValue(formData, "driverFeePerKm");
+      if ((driverFeeBase === "") !== (driverFeePerKm === "")) {
+        return { ok: false, message: "Preencha os dois valores do ganho do estafeta ou deixe ambos vazios." };
+      }
+      if (wantsMbWay) {
+        const { data: paymentSettings } = await supabase
+          .from("restaurant_settings")
+          .select("stripe_charges_enabled, stripe_details_submitted, stripe_mb_way_enabled")
+          .eq("restaurant_id", restaurantId)
+          .single();
+        if (!paymentSettings?.stripe_charges_enabled || !paymentSettings.stripe_details_submitted || !paymentSettings.stripe_mb_way_enabled) {
+          return { ok: false, message: "Conclua primeiro a ligação da conta Stripe para ativar o MB WAY." };
+        }
+      }
+      Object.assign(settingsUpdates, {
+        accepts_cash: acceptsCash,
+        accepts_terminal: acceptsTerminal,
+        accepts_mb_way: wantsMbWay,
+        driver_pool_mode: driverPoolMode as Database["public"]["Enums"]["driver_pool_mode"],
+        driver_fee_base: driverFeeBase === "" ? null : Math.max(0, Number(driverFeeBase)),
+        driver_fee_per_km: driverFeePerKm === "" ? null : Math.max(0, Number(driverFeePerKm)),
       });
     }
 

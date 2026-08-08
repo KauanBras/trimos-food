@@ -66,6 +66,23 @@ test("quantidades dos complementos atualizam o preço e chegam ao carrinho", asy
   expect(runtimeErrors).toEqual([]);
 });
 
+test("checkout permite terminal e dinheiro com indicação de troco", async ({
+  page,
+}) => {
+  const runtimeErrors = captureRuntimeErrors(page);
+
+  await page.goto(`/r/${restaurantSlug}`);
+  await page.getByRole("link", { name: /Super Hiro 44 Peças/i }).click();
+  await page.getByRole("button", { name: /Adicionar/ }).click();
+  await page.goto(`/r/${restaurantSlug}/carrinho`);
+
+  await expect(page.getByText("Pagamento", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Terminal no levantamento|Levar terminal/)).toBeVisible();
+  await page.getByText("Dinheiro", { exact: true }).click();
+  await expect(page.getByLabel("Precisa de troco para quanto?")).toBeVisible();
+  expect(runtimeErrors).toEqual([]);
+});
+
 test("reserva pública é determinística e não gera erro de hidratação", async ({
   page,
 }) => {

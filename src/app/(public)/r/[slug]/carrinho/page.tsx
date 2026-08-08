@@ -15,6 +15,9 @@ type Settings = {
   deliveryOriginLongitude: number | null;
   freeDeliveryFrom: number | null;
   defaultPreparationMinutes: number;
+  acceptsCash: boolean;
+  acceptsTerminal: boolean;
+  acceptsMbWay: boolean;
 };
 
 export default async function PublicCartPage({ params }: Props) {
@@ -28,5 +31,5 @@ export default async function PublicCartPage({ params }: Props) {
   ]);
   const settings = (data ?? {}) as Json as Settings;
   const operatingStatus = getRestaurantOperatingStatus(businessHours ?? [], restaurant.timezone);
-  return <PublicCheckoutClient restaurant={{ id: restaurant.id, name: restaurant.name, slug: restaurant.slug, currencyCode: restaurant.currency_code, acceptsDelivery: restaurant.accepts_delivery, acceptsPickup: restaurant.accepts_pickup, isOpen: operatingStatus.isOpen, operatingLabel: operatingStatus.label }} settings={{ minimumOrderAmount: Number(settings.minimumOrderAmount ?? 0), defaultDeliveryFee: Number(settings.defaultDeliveryFee ?? 0), deliveryFeePerKm: Number(settings.deliveryFeePerKm ?? 0), deliveryRadiusKm: Number(settings.deliveryRadiusKm ?? 0), deliveryOriginLatitude: settings.deliveryOriginLatitude === null || settings.deliveryOriginLatitude === undefined ? null : Number(settings.deliveryOriginLatitude), deliveryOriginLongitude: settings.deliveryOriginLongitude === null || settings.deliveryOriginLongitude === undefined ? null : Number(settings.deliveryOriginLongitude), freeDeliveryFrom: settings.freeDeliveryFrom === null || settings.freeDeliveryFrom === undefined ? null : Number(settings.freeDeliveryFrom), defaultPreparationMinutes: Number(settings.defaultPreparationMinutes ?? 30) }} />;
+  return <PublicCheckoutClient restaurant={{ id: restaurant.id, name: restaurant.name, slug: restaurant.slug, currencyCode: restaurant.currency_code, acceptsDelivery: restaurant.accepts_delivery, acceptsPickup: restaurant.accepts_pickup, isOpen: operatingStatus.isOpen, operatingLabel: operatingStatus.label }} settings={{ minimumOrderAmount: Number(settings.minimumOrderAmount ?? 0), defaultDeliveryFee: Number(settings.defaultDeliveryFee ?? 0), deliveryFeePerKm: Number(settings.deliveryFeePerKm ?? 0), deliveryRadiusKm: Number(settings.deliveryRadiusKm ?? 0), deliveryOriginLatitude: settings.deliveryOriginLatitude === null || settings.deliveryOriginLatitude === undefined ? null : Number(settings.deliveryOriginLatitude), deliveryOriginLongitude: settings.deliveryOriginLongitude === null || settings.deliveryOriginLongitude === undefined ? null : Number(settings.deliveryOriginLongitude), freeDeliveryFrom: settings.freeDeliveryFrom === null || settings.freeDeliveryFrom === undefined ? null : Number(settings.freeDeliveryFrom), defaultPreparationMinutes: Number(settings.defaultPreparationMinutes ?? 30), acceptsCash: Boolean(settings.acceptsCash), acceptsTerminal: Boolean(settings.acceptsTerminal), acceptsMbWay: Boolean(settings.acceptsMbWay) }} />;
 }

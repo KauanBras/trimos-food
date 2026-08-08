@@ -45,6 +45,8 @@ type DriverDelivery = {
   status: DeliveryStatus;
   delivery_address: string;
   delivery_fee: number;
+  driver_fee: number;
+  assignment_source: Database["public"]["Enums"]["driver_assignment_source"] | null;
   distance_km: number | null;
   offer_expires_at: string | null;
   created_at: string;
@@ -52,16 +54,18 @@ type DriverDelivery = {
     customer_name: string;
     customer_phone: string | null;
     total: number;
+    payment_method: Database["public"]["Enums"]["payment_method"];
+    payment_status: Database["public"]["Enums"]["payment_status"];
+    cash_tendered_amount: number | null;
   } | null;
+  restaurants: { name: string; currency_code: string } | null;
 };
 
 type DriverDashboardClientProps = {
   driverId: string;
-  restaurantId: string;
   initialStatus: DriverStatus;
   initialDeliveries: DriverDelivery[];
   initialRejectedDeliveryIds?: string[];
-  currencyCode: string;
 };
 
 function formatMoney(value: number, currencyCode: string) {
@@ -94,11 +98,9 @@ function getRemainingOfferSeconds(expiresAt: string | null, now: number) {
 
 export function DriverDashboardClient({
   driverId,
-  restaurantId,
   initialStatus,
   initialDeliveries,
   initialRejectedDeliveryIds = [],
-  currencyCode,
 }: DriverDashboardClientProps) {
   const supabase = useMemo(() => createClient(), []);
 
@@ -148,16 +150,24 @@ export function DriverDashboardClient({
         status,
         delivery_address,
         delivery_fee,
+        driver_fee,
+        assignment_source,
         distance_km,
         offer_expires_at,
         created_at,
         orders (
           customer_name,
           customer_phone,
-          total
+          total,
+          payment_method,
+          payment_status,
+          cash_tendered_amount
+        ),
+        restaurants (
+          name,
+          currency_code
         )
       `)
-      .eq("restaurant_id", restaurantId)
       .in("status", [
         "searching_driver",
         "offered",
@@ -175,19 +185,18 @@ export function DriverDashboardClient({
 
     setNow(Date.now());
     setDeliveries((data ?? []) as DriverDelivery[]);
-  }, [restaurantId, supabase]);
+  }, [supabase]);
 
 
   useEffect(() => {
     const channel = supabase
-      .channel(`driver-dashboard-${restaurantId}-${driverId}`)
+      .channel(`driver-dashboard-${driverId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "deliveries",
-          filter: `restaurant_id=eq.${restaurantId}`,
         },
         () => {
           void fetchDeliveries();
@@ -202,7 +211,7 @@ export function DriverDashboardClient({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [driverId, fetchDeliveries, restaurantId, supabase]);
+  }, [driverId, fetchDeliveries, supabase]);
 
   useEffect(() => {
     const hasOffer = deliveries.some(
@@ -402,6 +411,7 @@ export function DriverDashboardClient({
     action:
       | "accept_delivery"
       | "pick_up_delivery"
+      | "confirm_delivery_payment"
       | "complete_delivery"
   ) {
 
@@ -432,6 +442,10 @@ export function DriverDashboardClient({
         toast.success("Pedido recolhido", {
           description: "Agora siga para a morada do cliente.",
         });
+      }
+
+      if (action === "confirm_delivery_payment") {
+        toast.success("Recebimento confirmado");
       }
 
       if (action === "complete_delivery") {
@@ -609,6 +623,7 @@ export function DriverDashboardClient({
           <div className="space-y-4">
             {visibleDeliveries.map((delivery) => {
               const customer = delivery.orders;
+              const currencyCode = delivery.restaurants?.currency_code ?? "EUR";
               const remainingSeconds =
                 delivery.status === "offered"
                   ? getRemainingOfferSeconds(
@@ -633,6 +648,11 @@ export function DriverDashboardClient({
                           {deliveryStatusLabel(delivery.status)}
                         </Badge>
 
+                        <p className="mb-2 text-sm font-medium text-zinc-700">
+                          {delivery.restaurants?.name ?? "Restaurante"}
+                          {delivery.assignment_source === "network" ? " · Rede Trimos" : " · Frota privada"}
+                        </p>
+
                         <CardTitle className="text-xl">
                           {customer?.customer_name ?? "Cliente"}
                         </CardTitle>
@@ -644,12 +664,13 @@ export function DriverDashboardClient({
                       </div>
 
                       <div className="text-right">
-                        <p className="text-lg font-semibold">
-                          {formatMoney(customer?.total ?? 0, currencyCode)}
+                        <p className="text-xs text-zinc-500">O seu ganho</p>
+                        <p className="text-lg font-semibold text-emerald-700">
+                          {formatMoney(delivery.driver_fee, currencyCode)}
                         </p>
 
                         <p className="mt-1 text-xs text-zinc-500">
-                          Taxa: {formatMoney(delivery.delivery_fee, currencyCode)}
+                          Pedido: {formatMoney(customer?.total ?? 0, currencyCode)}
                         </p>
                       </div>
                     </div>
@@ -719,6 +740,22 @@ export function DriverDashboardClient({
                       </div>
                     </div>
 
+                    {customer ? (
+                      <div className="rounded-2xl border border-zinc-200 p-4 text-sm">
+                        <p className="font-medium">
+                          {customer.payment_method === "mb_way" ? "MB WAY online" : customer.payment_method === "terminal" ? "Levar terminal" : "Receber em dinheiro"}
+                        </p>
+                        <p className="mt-1 text-zinc-500">
+                          {customer.payment_status === "paid" ? "Pagamento confirmado." : "Confirme o recebimento antes de concluir."}
+                        </p>
+                        {customer.payment_method === "cash" && customer.cash_tendered_amount !== null ? (
+                          <p className="mt-2 font-medium text-amber-700">
+                            Levar {formatMoney(Math.max(0, customer.cash_tendered_amount - customer.total), currencyCode)} de troco.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+
                     {(delivery.status === "searching_driver" ||
                       delivery.status === "offered") && (
                       <div className="grid grid-cols-2 gap-3">
@@ -769,22 +806,16 @@ export function DriverDashboardClient({
                       </Button>
                     )}
 
-                    {delivery.status === "picked_up" && (
-                      <Button
-                        type="button"
-                        className="h-12 w-full bg-emerald-600 hover:bg-emerald-500"
-                        disabled={loadingAction !== null}
-                        onClick={() =>
-                          void executeDeliveryAction(
-                            delivery.id,
-                            "complete_delivery"
-                          )
-                        }
-                      >
-                        <Check className="mr-2 size-5" />
-                        Confirmar entrega ao cliente
+                    {delivery.status === "picked_up" && customer?.payment_status !== "paid" ? (
+                      <Button type="button" className="h-12 w-full bg-amber-500 text-zinc-950 hover:bg-amber-400" disabled={loadingAction !== null} onClick={() => void executeDeliveryAction(delivery.id, "confirm_delivery_payment")}>
+                        <Check className="mr-2 size-5" /> Confirmar recebimento
                       </Button>
-                    )}
+                    ) : null}
+                    {delivery.status === "picked_up" && customer?.payment_status === "paid" ? (
+                      <Button type="button" className="h-12 w-full bg-emerald-600 hover:bg-emerald-500" disabled={loadingAction !== null} onClick={() => void executeDeliveryAction(delivery.id, "complete_delivery")}>
+                        <Check className="mr-2 size-5" /> Confirmar entrega ao cliente
+                      </Button>
+                    ) : null}
                   </CardContent>
                 </Card>
               );

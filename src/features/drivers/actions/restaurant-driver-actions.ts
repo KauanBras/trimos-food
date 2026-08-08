@@ -62,14 +62,35 @@ export async function setDriverActiveAction(driverId: string, active: boolean): 
     const { restaurantId, role } = await getCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para gerir estafetas." };
     const supabase = await createClient();
-    const { data: driver } = await supabase.from("drivers").select("status").eq("id", driverId).eq("restaurant_id", restaurantId).maybeSingle();
-    if (!driver) return { ok: false, message: "Estafeta não encontrado." };
-    if (!active && driver.status === "busy") return { ok: false, message: "Conclua a entrega ativa antes de suspender este estafeta." };
-    const { error } = await supabase.from("drivers").update({ is_active: active, status: active ? "offline" : "suspended" }).eq("id", driverId).eq("restaurant_id", restaurantId);
+    const { data: membership } = await supabase.from("restaurant_drivers").select("id, drivers(status)").eq("driver_id", driverId).eq("restaurant_id", restaurantId).maybeSingle();
+    if (!membership) return { ok: false, message: "Estafeta não encontrado." };
+    if (!active && membership.drivers?.status === "busy") return { ok: false, message: "Conclua a entrega ativa antes de suspender este estafeta." };
+    const { error } = await supabase.from("restaurant_drivers").update({ is_active: active }).eq("id", membership.id).eq("restaurant_id", restaurantId);
     if (error) throw new Error(error.message);
     revalidatePath("/restaurant/drivers");
     return { ok: true, message: active ? "Estafeta reativado." : "Estafeta suspenso." };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Não foi possível atualizar o estafeta." };
+  }
+}
+
+export async function settleDriverEarningsAction(
+  earningIds: string[],
+  reference: string,
+): Promise<DriverManagementResult> {
+  try {
+    const { restaurantId, role } = await getCurrentRestaurant();
+    if (!canManage(role)) return { ok: false, message: "Não tem permissão para liquidar valores." };
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("settle_driver_earnings", {
+      requested_restaurant_id: restaurantId,
+      requested_earning_ids: earningIds,
+      requested_reference: reference.trim(),
+    });
+    if (error) throw new Error(error.message);
+    revalidatePath("/restaurant/drivers");
+    return { ok: true, message: `${data ?? 0} acerto(s) marcado(s) como liquidado(s).` };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Não foi possível liquidar os valores." };
   }
 }

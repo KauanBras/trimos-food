@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { updateDriverProfileAction } from "@/features/drivers/actions/driver-actions";
 import { getCurrentDriver } from "@/lib/drivers/get-current-driver";
 import { createClient } from "@/lib/supabase/server";
@@ -67,6 +68,45 @@ export default async function DriverProfilePage({
               <div className="space-y-2">
                 <Label htmlFor="vehiclePlate">Matrícula</Label>
                 <Input id="vehiclePlate" name="vehiclePlate" placeholder="AA-00-AA" defaultValue={driver.vehicle_plate ?? ""} />
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-zinc-200 p-4">
+              <label className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium">Disponível para a rede Trimos</p>
+                  <p className="text-sm text-zinc-500">Permite receber ofertas de outros restaurantes próximos com esta mesma conta.</p>
+                </div>
+                <Switch name="networkEnabled" defaultChecked={driver.is_network_enabled} />
+              </label>
+              <div className="space-y-2">
+                <Label htmlFor="networkRadiusKm">Distância máxima da rede (km)</Label>
+                <Input id="networkRadiusKm" name="networkRadiusKm" type="number" min="1" max="100" step="1" defaultValue={driver.network_radius_km} />
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-zinc-200 p-4">
+              <div>
+                <p className="font-medium">Como prefere receber os acertos</p>
+                <p className="text-sm text-zinc-500">O sistema calcula os valores; o restaurante regista a liquidação.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payoutMethod">Forma de recebimento</Label>
+                <select id="payoutMethod" name="payoutMethod" defaultValue={driver.payout_method} className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm">
+                  <option value="mb_way">MB WAY</option>
+                  <option value="bank_transfer">Transferência bancária</option>
+                  <option value="cash">Dinheiro</option>
+                </select>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="payoutPhone">Telefone MB WAY</Label>
+                  <Input id="payoutPhone" name="payoutPhone" type="tel" defaultValue={driver.payout_phone ?? driver.phone ?? ""} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="payoutIban">IBAN</Label>
+                  <Input id="payoutIban" name="payoutIban" autoComplete="off" defaultValue={driver.payout_iban ?? ""} />
+                </div>
               </div>
             </div>
 

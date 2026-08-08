@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, LoaderCircle, LocateFixed, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { ArrowLeft, Banknote, CreditCard, LoaderCircle, LocateFixed, Minus, Plus, ShoppingBag, Smartphone, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { readCart, type CartItem, writeCart } from "@/features/cart/types";
 import { createClient } from "@/lib/supabase/client";
+import type { Database } from "@/types/database";
 
 type Props = {
   restaurant: {
@@ -33,10 +34,14 @@ type Props = {
     deliveryOriginLongitude: number | null;
     freeDeliveryFrom: number | null;
     defaultPreparationMinutes: number;
+    acceptsCash: boolean;
+    acceptsTerminal: boolean;
+    acceptsMbWay: boolean;
   };
 };
 
 type DeliveryLocation = { latitude: number; longitude: number };
+type PaymentMethod = Database["public"]["Enums"]["payment_method"];
 
 function distanceInKilometers(origin: DeliveryLocation, destination: DeliveryLocation) {
   const radians = (degrees: number) => degrees * Math.PI / 180;
@@ -55,6 +60,13 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
     restaurant.acceptsDelivery ? "delivery" : "pickup",
   );
   const [submitting, setSubmitting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() =>
+    settings.acceptsMbWay
+      ? "mb_way"
+      : settings.acceptsTerminal
+        ? "terminal"
+        : "cash",
+  );
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [deliveryLocation, setDeliveryLocation] = useState<DeliveryLocation | null>(null);
@@ -146,7 +158,7 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
     setSubmitting(true);
     const formData = new FormData(event.currentTarget);
     const supabase = createClient();
-    const { data, error } = await supabase.rpc("create_public_order", {
+    const orderRequest = {
       requested_restaurant_id: restaurant.id,
       requested_customer_name: String(formData.get("customerName") ?? ""),
       requested_customer_phone: String(formData.get("customerPhone") ?? ""),
@@ -169,14 +181,47 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
         quantity: item.quantity,
         notes: item.notes ?? "",
       })),
-    });
-    setSubmitting(false);
+      requested_payment_method: paymentMethod,
+      requested_cash_tendered_amount:
+        paymentMethod === "cash" && String(formData.get("cashTenderedAmount") ?? "").trim()
+          ? Number(formData.get("cashTenderedAmount"))
+          : null,
+    };
+    const { data, error } = await supabase.rpc(
+      "create_public_order",
+      orderRequest as unknown as Database["public"]["Functions"]["create_public_order"]["Args"],
+    );
     if (error || !data?.[0]) {
+      setSubmitting(false);
       toast.error("Não foi possível concluir o pedido.", {
         description: error?.message,
       });
       return;
     }
+
+    if (paymentMethod === "mb_way") {
+      const response = await fetch("/api/payments/stripe/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          orderId: data[0].order_id,
+          token: data[0].order_token,
+        }),
+      });
+      const payment = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !payment.url) {
+        setSubmitting(false);
+        toast.error("Não foi possível iniciar o MB WAY.", {
+          description: payment.error,
+        });
+        return;
+      }
+      writeCart(restaurant.id, []);
+      window.location.assign(payment.url);
+      return;
+    }
+
+    setSubmitting(false);
     writeCart(restaurant.id, []);
     router.push(
       `/r/${restaurant.slug}/pedido/${data[0].order_id}?token=${data[0].order_token}`,
@@ -331,6 +376,63 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
                   <label className="text-sm font-medium">Email</label>
                   <Input name="customerEmail" type="email" className="mt-2" />
                 </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-none">
+              <CardHeader>
+                <CardTitle>Pagamento</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {settings.acceptsMbWay && (
+                  <label className="flex cursor-pointer items-center gap-3 rounded-xl border p-4">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      checked={paymentMethod === "mb_way"}
+                      onChange={() => setPaymentMethod("mb_way")}
+                    />
+                    <Smartphone className="size-5 text-emerald-600" />
+                    <span><span className="block font-medium">MB WAY</span><span className="text-xs text-zinc-500">Pagar agora com segurança</span></span>
+                  </label>
+                )}
+                {settings.acceptsTerminal && (
+                  <label className="flex cursor-pointer items-center gap-3 rounded-xl border p-4">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      checked={paymentMethod === "terminal"}
+                      onChange={() => setPaymentMethod("terminal")}
+                    />
+                    <CreditCard className="size-5 text-blue-600" />
+                    <span><span className="block font-medium">{orderType === "delivery" ? "Levar terminal" : "Terminal no levantamento"}</span><span className="text-xs text-zinc-500">Cartão ou MB WAY no momento da entrega</span></span>
+                  </label>
+                )}
+                {settings.acceptsCash && (
+                  <label className="flex cursor-pointer items-center gap-3 rounded-xl border p-4">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      checked={paymentMethod === "cash"}
+                      onChange={() => setPaymentMethod("cash")}
+                    />
+                    <Banknote className="size-5 text-amber-600" />
+                    <span><span className="block font-medium">Dinheiro</span><span className="text-xs text-zinc-500">Pagamento no recebimento</span></span>
+                  </label>
+                )}
+                {paymentMethod === "cash" && (
+                  <div className="space-y-2 rounded-xl bg-zinc-50 p-4">
+                    <label className="text-sm font-medium" htmlFor="cashTenderedAmount">Precisa de troco para quanto?</label>
+                    <Input
+                      id="cashTenderedAmount"
+                      name="cashTenderedAmount"
+                      type="number"
+                      min={total}
+                      step="0.01"
+                      placeholder={`Sem troco ou, por exemplo, ${Math.ceil(total / 10) * 10}`}
+                    />
+                    <p className="text-xs text-zinc-500">Deixe vazio se entregar o valor exato.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
             <Card className="shadow-none">
