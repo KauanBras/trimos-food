@@ -1,9 +1,5 @@
-import {
-  activateDriverModeAction,
-} from "@/features/drivers/actions/driver-actions";
 import { DriverDashboardClient } from "@/features/drivers/components/driver-dashboard-client";
 import { DriverPushSetup } from "@/features/notifications/components/driver-push-setup";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -30,9 +26,9 @@ export default async function DriverDashboardPage({
     return (
       <Card className="mt-10 border-zinc-200 shadow-none">
         <CardHeader>
-          <CardTitle>Ativar modo estafeta</CardTitle>
+          <CardTitle>Convite necessário</CardTitle>
           <CardDescription>
-            Ative o perfil para testar o fluxo das entregas.
+            O seu perfil ainda não está associado a um restaurante.
           </CardDescription>
         </CardHeader>
 
@@ -43,14 +39,9 @@ export default async function DriverDashboardPage({
             </div>
           )}
 
-          <form action={activateDriverModeAction}>
-            <Button
-              type="submit"
-              className="h-11 w-full bg-zinc-950 hover:bg-zinc-800"
-            >
-              Ativar perfil de estafeta
-            </Button>
-          </form>
+          <p className="rounded-2xl bg-zinc-50 p-4 text-sm text-zinc-600">
+            Peça ao restaurante para enviar o link de convite. Abra esse link com esta conta para ativar o acesso às entregas.
+          </p>
         </CardContent>
       </Card>
     );
@@ -66,22 +57,6 @@ export default async function DriverDashboardPage({
 
   if (userError || !user) {
     throw new Error("Sessão do estafeta não encontrada.");
-  }
-
-  const effectiveStatus =
-    driver.status === "offline" ? "available" : driver.status;
-
-  if (driver.status === "offline") {
-    const { error: availabilityError } = await supabase
-      .from("drivers")
-      .update({ status: "available" })
-      .eq("id", driver.id);
-
-    if (availabilityError) {
-      throw new Error(
-        `Não foi possível ativar o estafeta: ${availabilityError.message}`
-      );
-    }
   }
 
   const { data: deliveries, error } = await supabase
@@ -129,6 +104,12 @@ export default async function DriverDashboardPage({
     );
   }
 
+  const { data: restaurant } = await supabase
+    .from("restaurants")
+    .select("currency_code")
+    .eq("id", restaurantId)
+    .maybeSingle();
+
   return (
     <div className="space-y-5">
       <DriverPushSetup
@@ -140,11 +121,12 @@ export default async function DriverDashboardPage({
       <DriverDashboardClient
         driverId={driver.id}
         restaurantId={restaurantId}
-        initialStatus={effectiveStatus}
+        initialStatus={driver.status}
         initialDeliveries={deliveries ?? []}
         initialRejectedDeliveryIds={
           rejections?.map((item) => item.delivery_id) ?? []
         }
+        currencyCode={restaurant?.currency_code ?? "EUR"}
       />
     </div>
   );

@@ -127,7 +127,6 @@ export default async function OnboardingPage({
                 <Input
                   id="restaurantName"
                   name="restaurantName"
-                  defaultValue="Hirotatsu Sushi"
                   placeholder="Ex.: Nome do restaurante"
                   autoFocus
                   required

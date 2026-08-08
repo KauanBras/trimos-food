@@ -27,6 +27,7 @@ import {
   startNotificationAlarm,
   stopNotificationAlarm,
   unlockNotificationAudio,
+  isNotificationAudioReady,
 } from "@/lib/audio/notification-alarm";
 import type { Database } from "@/types/database";
 
@@ -60,12 +61,13 @@ type DriverDashboardClientProps = {
   initialStatus: DriverStatus;
   initialDeliveries: DriverDelivery[];
   initialRejectedDeliveryIds?: string[];
+  currencyCode: string;
 };
 
-function formatMoney(value: number) {
+function formatMoney(value: number, currencyCode: string) {
   return new Intl.NumberFormat("pt-PT", {
     style: "currency",
-    currency: "EUR",
+    currency: currencyCode,
   }).format(value);
 }
 
@@ -96,6 +98,7 @@ export function DriverDashboardClient({
   initialStatus,
   initialDeliveries,
   initialRejectedDeliveryIds = [],
+  currencyCode,
 }: DriverDashboardClientProps) {
   const supabase = useMemo(() => createClient(), []);
 
@@ -113,17 +116,12 @@ export function DriverDashboardClient({
   );
 
   const [now, setNow] = useState(() => Date.now());
-  const [audioEnabled, setAudioEnabled] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return (
-      window.localStorage.getItem(
-        "trimos-driver-audio-enabled"
-      ) === "true"
-    );
-  });
+  const [audioEnabled, setAudioEnabled] = useState(() =>
+    isNotificationAudioReady(),
+  );
+  const [locationState, setLocationState] = useState<
+    "idle" | "active" | "error"
+  >("idle");
 
   const enableOfferAudio = useCallback(async () => {
     try {
@@ -131,12 +129,6 @@ export function DriverDashboardClient({
 
       setAudioEnabled(enabled);
 
-      if (enabled) {
-        window.localStorage.setItem(
-          "trimos-driver-audio-enabled",
-          "true"
-        );
-      }
     } catch (error) {
       toast.error("Não foi possível ativar o som", {
         description:
@@ -245,6 +237,62 @@ export function DriverDashboardClient({
 
     return () => stopNotificationAlarm();
   }, [audioEnabled, deliveries, driverId]);
+
+  useEffect(() => {
+    if (driverStatus === "offline") {
+      return;
+    }
+
+    if (!("geolocation" in navigator)) {
+      const unsupportedTimer = window.setTimeout(() => {
+        setLocationState("error");
+      }, 0);
+
+      return () => window.clearTimeout(unsupportedTimer);
+    }
+
+    let lastPersistedAt = 0;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setLocationState("active");
+
+        const observedAt = Date.now();
+        if (observedAt - lastPersistedAt < 15_000) {
+          return;
+        }
+
+        lastPersistedAt = observedAt;
+
+        void supabase
+          .from("drivers")
+          .update({
+            current_latitude: position.coords.latitude,
+            current_longitude: position.coords.longitude,
+            location_updated_at: new Date(observedAt).toISOString(),
+          })
+          .eq("id", driverId)
+          .then(({ error }) => {
+            if (error) {
+              console.error(
+                "Não foi possível atualizar a localização do estafeta:",
+                error.message,
+              );
+            }
+          });
+      },
+      () => {
+        setLocationState("error");
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 10_000,
+        timeout: 20_000,
+      },
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [driverId, driverStatus, supabase]);
 
   useEffect(() => {
     const expiredOffer = deliveries.find(
@@ -480,6 +528,24 @@ export function DriverDashboardClient({
                     ? "Conclua a entrega atual antes de aceitar outra."
                     : "Fique disponível para receber entregas."}
               </p>
+
+              {driverStatus !== "offline" && (
+                <p
+                  className={`mt-2 text-xs ${
+                    locationState === "active"
+                      ? "text-emerald-400"
+                      : locationState === "error"
+                        ? "text-amber-300"
+                        : "text-zinc-500"
+                  }`}
+                >
+                  {locationState === "active"
+                    ? "Localização ativa para a operação."
+                    : locationState === "error"
+                      ? "Autorize a localização para melhorar a atribuição."
+                      : "A obter a sua localização..."}
+                </p>
+              )}
             </div>
 
             <div className="rounded-2xl bg-white/10 p-3">
@@ -579,11 +645,11 @@ export function DriverDashboardClient({
 
                       <div className="text-right">
                         <p className="text-lg font-semibold">
-                          {formatMoney(customer?.total ?? 0)}
+                          {formatMoney(customer?.total ?? 0, currencyCode)}
                         </p>
 
                         <p className="mt-1 text-xs text-zinc-500">
-                          Taxa: {formatMoney(delivery.delivery_fee)}
+                          Taxa: {formatMoney(delivery.delivery_fee, currencyCode)}
                         </p>
                       </div>
                     </div>

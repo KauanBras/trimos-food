@@ -13,12 +13,16 @@ export default async function KitchenServerPage() {
       customer_name,
       status,
       estimated_minutes,
+      accepted_at,
+      ready_at,
       created_at,
       order_items (
         id,
         product_name,
         quantity,
-        notes
+        notes,
+        variant_name,
+        selected_modifiers
       )
     `)
     .eq("restaurant_id", restaurantId)

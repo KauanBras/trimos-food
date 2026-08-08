@@ -17,10 +17,14 @@ function createSlug(value: string) {
 export async function createRestaurantAction(formData: FormData) {
   const rawName = formData.get("restaurantName");
 
-  if (typeof rawName !== "string" || !rawName.trim()) {
+  if (
+    typeof rawName !== "string" ||
+    rawName.trim().length < 2 ||
+    rawName.trim().length > 100
+  ) {
     redirect(
       `/onboarding?error=${encodeURIComponent(
-        "Indique o nome do restaurante."
+        "Indique um nome entre 2 e 100 caracteres."
       )}`
     );
   }

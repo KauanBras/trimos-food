@@ -7,7 +7,6 @@ import {
   ChefHat,
   Clock3,
   Flame,
-  MoreHorizontal,
   PackageCheck,
   Timer,
 } from "lucide-react";
@@ -22,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
+import type { Json } from "@/types/database";
 import type { Database } from "@/types/database";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
@@ -31,12 +31,16 @@ type KitchenOrder = {
   customer_name: string;
   status: OrderStatus;
   estimated_minutes: number | null;
+  accepted_at: string | null;
+  ready_at: string | null;
   created_at: string;
   order_items: {
     id: string;
     product_name: string;
     quantity: number;
     notes: string | null;
+    variant_name: string | null;
+    selected_modifiers: Json;
   }[];
 };
 
@@ -96,12 +100,16 @@ function KitchenClient({
         customer_name,
         status,
         estimated_minutes,
+        accepted_at,
+        ready_at,
         created_at,
         order_items (
           id,
           product_name,
           quantity,
-          notes
+          notes,
+          variant_name,
+          selected_modifiers
         )
       `)
       .eq("id", orderId)
@@ -202,6 +210,19 @@ function KitchenClient({
   );
 
   const readyOrders = orders.filter((order) => order.status === "ready");
+  const measuredTimes = orders
+    .filter((order) => order.accepted_at && order.ready_at)
+    .map((order) => {
+      return Math.max(
+        0,
+        (new Date(order.ready_at!).getTime() -
+          new Date(order.accepted_at!).getTime()) /
+          60_000,
+      );
+    });
+  const averageCurrentMinutes = measuredTimes.length
+    ? Math.round(measuredTimes.reduce((sum, minutes) => sum + minutes, 0) / measuredTimes.length)
+    : null;
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -261,7 +282,7 @@ function KitchenClient({
           ) : (
             <div className="grid gap-5 2xl:grid-cols-2">
               {preparingOrders.map((order) => {
-                const elapsed = getElapsedMinutes(order.created_at);
+                const elapsed = getElapsedMinutes(order.accepted_at ?? order.created_at);
                 const estimated = order.estimated_minutes ?? 30;
                 const urgency = getUrgency(elapsed, estimated);
                 const progress = Math.min(
@@ -292,10 +313,6 @@ function KitchenClient({
                           >
                             {urgency.label}
                           </Badge>
-
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="size-4" />
-                          </Button>
                         </div>
                       </div>
                     </CardHeader>
@@ -309,6 +326,7 @@ function KitchenClient({
                           >
                             <p className="font-semibold">
                               {item.quantity}x {item.product_name}
+                              {item.variant_name ? ` · ${item.variant_name}` : ""}
                             </p>
 
                             {item.notes && (
@@ -316,6 +334,7 @@ function KitchenClient({
                                 Nota: {item.notes}
                               </p>
                             )}
+                            {Array.isArray(item.selected_modifiers) && item.selected_modifiers.map((modifier) => typeof modifier === "object" && modifier && "option" in modifier ? `${"quantity" in modifier ? Number(modifier.quantity) : 1}x ${String(modifier.option)}` : "").filter(Boolean).length > 0 && <p className="mt-1 text-sm text-zinc-500">{item.selected_modifiers.map((modifier) => typeof modifier === "object" && modifier && "option" in modifier ? `${"quantity" in modifier ? Number(modifier.quantity) : 1}x ${String(modifier.option)}` : "").filter(Boolean).join(", ")}</p>}
                           </div>
                         ))}
                       </div>
@@ -395,6 +414,8 @@ function KitchenClient({
                       {order.order_items.map((item) => (
                         <p key={item.id} className="text-sm">
                           {item.quantity}x {item.product_name}
+                          {item.variant_name ? ` · ${item.variant_name}` : ""}
+                          {Array.isArray(item.selected_modifiers) && item.selected_modifiers.length > 0 ? ` · ${item.selected_modifiers.map((modifier) => typeof modifier === "object" && modifier && "option" in modifier ? `${"quantity" in modifier ? Number(modifier.quantity) : 1}x ${String(modifier.option)}` : "").filter(Boolean).join(", ")}` : ""}
                         </p>
                       ))}
                     </div>
@@ -413,7 +434,9 @@ function KitchenClient({
 
                 <div>
                   <p className="font-semibold">Tempo médio atual</p>
-                  <p className="mt-1 text-3xl font-semibold">24 min</p>
+                  <p className="mt-1 text-3xl font-semibold">
+                    {averageCurrentMinutes === null ? "—" : `${averageCurrentMinutes} min`}
+                  </p>
                 </div>
               </div>
             </CardContent>

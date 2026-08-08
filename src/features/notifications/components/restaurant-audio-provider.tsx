@@ -2,45 +2,57 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BellRing } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
   startNotificationAlarm,
   stopNotificationAlarm,
   unlockNotificationAudio,
+  isNotificationAudioReady,
 } from "@/lib/audio/notification-alarm";
 import { createClient } from "@/lib/supabase/client";
 
 type RestaurantAudioProviderProps = {
   restaurantId: string;
   initialNewOrders: number;
+  enabled?: boolean;
 };
 
 export function RestaurantAudioProvider({
   restaurantId,
   initialNewOrders,
+  enabled = true,
 }: RestaurantAudioProviderProps) {
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
   const audioUnlockedRef = useRef(false);
   const newOrdersCountRef = useRef(initialNewOrders);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
 
   const syncAlarm = useCallback((count: number) => {
     newOrdersCountRef.current = count;
+
+    if (!enabled || count <= 0) {
+      stopNotificationAlarm();
+      return;
+    }
 
     if (!audioUnlockedRef.current) {
       return;
     }
 
-    if (count > 0) {
-      startNotificationAlarm("restaurant");
-    } else {
-      stopNotificationAlarm();
-    }
-  }, []);
+    startNotificationAlarm("restaurant");
+  }, [enabled]);
 
   const fetchNewOrdersCount = useCallback(async () => {
+    if (!enabled) {
+      stopNotificationAlarm();
+      return;
+    }
+
     const { count, error } = await supabase
       .from("orders")
       .select("id", {
@@ -53,90 +65,83 @@ export function RestaurantAudioProvider({
     if (error) {
       console.error(
         "Não foi possível consultar os novos pedidos:",
-        error.message
+        error.message,
       );
       return;
     }
 
     syncAlarm(count ?? 0);
-  }, [restaurantId, supabase, syncAlarm]);
+  }, [enabled, restaurantId, supabase, syncAlarm]);
 
   const unlockAudio = useCallback(async () => {
     try {
-      await unlockNotificationAudio();
+      setAudioError(null);
+      const ready = await unlockNotificationAudio();
+      if (!ready) throw new Error("O navegador manteve o áudio suspenso.");
 
       audioUnlockedRef.current = true;
       setAudioEnabled(true);
 
-      window.sessionStorage.setItem(
-        "trimos-restaurant-audio-unlocked",
-        "true"
-      );
+      window.sessionStorage.setItem("trimos-restaurant-audio-unlocked", "true");
+
+      if ("Notification" in window && Notification.permission === "default") {
+        try {
+          await Notification.requestPermission();
+        } catch (notificationError) {
+          console.warn("Não foi possível pedir permissão de notificações:", notificationError);
+        }
+      }
 
       if (newOrdersCountRef.current > 0) {
         startNotificationAlarm("restaurant");
       }
     } catch (error) {
-      console.error("Não foi possível desbloquear o áudio:", error);
+      console.warn("Não foi possível desbloquear o áudio:", error);
+      setAudioError(
+        "O Safari não liberou o som. Toque novamente em Ativar som.",
+      );
     }
   }, []);
 
   useEffect(() => {
-    /*
-     * O navegador exige uma interação após um carregamento completo.
-     * Qualquer clique ou tecla no painel desbloqueia o áudio.
-     */
-    const handleInteraction = () => {
-      void unlockAudio();
-    };
+    if (!enabled) {
+      stopNotificationAlarm();
+      return;
+    }
 
-    window.addEventListener("pointerdown", handleInteraction, {
-      passive: true,
-      capture: true,
-    });
-
-    window.addEventListener("keydown", handleInteraction, {
-      capture: true,
-    });
-
-    return () => {
-      window.removeEventListener(
-        "pointerdown",
-        handleInteraction,
-        true
-      );
-
-      window.removeEventListener(
-        "keydown",
-        handleInteraction,
-        true
-      );
-    };
-  }, [unlockAudio]);
-
-  useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
+        if (!isNotificationAudioReady()) {
+          audioUnlockedRef.current = false;
+          setAudioEnabled(false);
+        }
         void fetchNewOrdersCount();
       }
     };
 
-    window.addEventListener("focus", fetchNewOrdersCount);
-    document.addEventListener(
-      "visibilitychange",
-      handleVisibilityChange
-    );
+    const handleFocus = () => {
+      if (!isNotificationAudioReady()) {
+        audioUnlockedRef.current = false;
+        setAudioEnabled(false);
+      }
+      void fetchNewOrdersCount();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      window.removeEventListener("focus", fetchNewOrdersCount);
-      document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityChange
-      );
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [fetchNewOrdersCount]);
+  }, [enabled, fetchNewOrdersCount]);
 
   useEffect(() => {
+    if (!enabled) {
+      stopNotificationAlarm();
+      return;
+    }
+
     void fetchNewOrdersCount();
 
     const pollingId = window.setInterval(() => {
@@ -153,9 +158,21 @@ export function RestaurantAudioProvider({
           table: "orders",
           filter: `restaurant_id=eq.${restaurantId}`,
         },
-        () => {
+        (payload) => {
+          if ("Notification" in window && Notification.permission === "granted") {
+            const orderId = String(payload.new.id ?? "novo");
+            const notification = new Notification("Novo pedido recebido", {
+              body: "Abra o painel para aceitar ou recusar o pedido.",
+              tag: `trimos-order-${orderId}`,
+            });
+            notification.onclick = () => {
+              window.focus();
+              router.push("/restaurant/orders");
+              notification.close();
+            };
+          }
           void fetchNewOrdersCount();
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -167,7 +184,7 @@ export function RestaurantAudioProvider({
         },
         () => {
           void fetchNewOrdersCount();
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -179,7 +196,7 @@ export function RestaurantAudioProvider({
         },
         () => {
           void fetchNewOrdersCount();
-        }
+        },
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
@@ -192,7 +209,11 @@ export function RestaurantAudioProvider({
       stopNotificationAlarm();
       void supabase.removeChannel(channel);
     };
-  }, [fetchNewOrdersCount, restaurantId, supabase]);
+  }, [enabled, fetchNewOrdersCount, restaurantId, router, supabase]);
+
+  if (!enabled) {
+    return null;
+  }
 
   if (audioEnabled) {
     return null;
@@ -207,10 +228,11 @@ export function RestaurantAudioProvider({
 
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-amber-950">
-            Ativar som dos pedidos
+            Ativar e testar som dos pedidos
           </p>
           <p className="text-sm text-amber-800">
-            Necessário para o alarme tocar até o pedido ser aceite.
+            {audioError ??
+              "Necessário para o alarme tocar até o pedido ser aceite."}
           </p>
         </div>
 
@@ -219,7 +241,7 @@ export function RestaurantAudioProvider({
           className="shrink-0 bg-amber-500 text-zinc-950 hover:bg-amber-400"
           onClick={() => void unlockAudio()}
         >
-          Ativar som
+          Ativar e testar
         </Button>
       </div>
     </div>

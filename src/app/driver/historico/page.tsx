@@ -10,6 +10,12 @@ export default async function DriverHistoryPage() {
   }
 
   const supabase = await createClient();
+  const { data: restaurant } = await supabase
+    .from("restaurants")
+    .select("currency_code")
+    .eq("id", driver.restaurant_id)
+    .maybeSingle();
+  const currencyCode = restaurant?.currency_code ?? "EUR";
 
   const { data: deliveries, error } = await supabase
     .from("deliveries")
@@ -70,14 +76,14 @@ export default async function DriverHistoryPage() {
                     Total:{" "}
                     {new Intl.NumberFormat("pt-PT", {
                       style: "currency",
-                      currency: "EUR",
+                      currency: currencyCode,
                     }).format(order?.total ?? 0)}
                   </p>
                   <p>
                     Taxa:{" "}
                     {new Intl.NumberFormat("pt-PT", {
                       style: "currency",
-                      currency: "EUR",
+                      currency: currencyCode,
                     }).format(delivery.delivery_fee)}
                   </p>
                 </CardContent>

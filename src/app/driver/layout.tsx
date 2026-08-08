@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   Bike,
   History,
@@ -10,6 +11,8 @@ import {
 
 import { logoutAction } from "@/features/auth/actions/auth-actions";
 import { Button } from "@/components/ui/button";
+import { getCurrentDriver } from "@/lib/drivers/get-current-driver";
+import { createClient } from "@/lib/supabase/server";
 
 const navigation = [
   {
@@ -34,11 +37,21 @@ const navigation = [
   },
 ];
 
-export default function DriverLayout({
+export default async function DriverLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { driver } = await getCurrentDriver();
+  const supabase = await createClient();
+  const { data: restaurant } = driver
+    ? await supabase
+        .from("restaurants")
+        .select("name, logo_url")
+        .eq("id", driver.restaurant_id)
+        .maybeSingle()
+    : { data: null };
+
   return (
     <div className="min-h-screen bg-zinc-100">
       <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white">
@@ -47,14 +60,18 @@ export default function DriverLayout({
             href="/driver/dashboard"
             className="flex items-center gap-3"
           >
-            <div className="flex size-10 items-center justify-center rounded-2xl bg-zinc-950 text-white">
-              <Bike className="size-5" />
+            <div className="relative flex size-10 items-center justify-center overflow-hidden rounded-2xl bg-zinc-950 text-white">
+              {restaurant?.logo_url ? (
+                <Image src={restaurant.logo_url} alt={restaurant.name} fill className="object-cover" sizes="40px" />
+              ) : (
+                <Bike className="size-5" />
+              )}
             </div>
 
             <div>
               <p className="font-semibold leading-none">Trimos Driver</p>
               <p className="mt-1 text-xs text-zinc-500">
-                Hirotatsu Sushi
+                {restaurant?.name ?? "Trimos Food"}
               </p>
             </div>
           </Link>

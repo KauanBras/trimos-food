@@ -19,13 +19,13 @@ export default async function ProductsPage() {
       is_available,
       category_id,
       categories (
-        name
+        name,
+        sort_order
       )
     `)
     .eq("restaurant_id", restaurantId)
-    .order("created_at", {
-      ascending: false,
-    });
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
 
   if (error) {
     throw new Error(

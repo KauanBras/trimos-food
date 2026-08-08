@@ -3,7 +3,7 @@ import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function OrdersPage() {
-  const { restaurantId } = await getCurrentRestaurant();
+  const { restaurantId, restaurant } = await getCurrentRestaurant();
   const supabase = await createClient();
 
   const { data: orders, error } = await supabase
@@ -24,7 +24,9 @@ export default async function OrdersPage() {
         product_name,
         quantity,
         unit_price,
-        notes
+        notes,
+        variant_name,
+        selected_modifiers
       )
     `)
     .eq("restaurant_id", restaurantId)
@@ -38,6 +40,7 @@ export default async function OrdersPage() {
     <OrdersClient
       restaurantId={restaurantId}
       initialOrders={orders ?? []}
+      currencyCode={restaurant.currency_code}
     />
   );
 }

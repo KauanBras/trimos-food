@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  CalendarDays,
   Clock3,
   MapPin,
   Search,
@@ -9,14 +10,18 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/server";
+import { PublicCartButton } from "@/features/cart/components/public-cart-button";
+import { getRestaurantOperatingStatus } from "@/lib/restaurants/operating-status";
 
 type PublicRestaurantPageProps = {
   params: Promise<{
     slug: string;
   }>;
+  searchParams: Promise<{ q?: string }>;
 };
 
 function formatMoney(
@@ -31,8 +36,11 @@ function formatMoney(
 
 export default async function PublicRestaurantPage({
   params,
+  searchParams,
 }: PublicRestaurantPageProps) {
   const { slug } = await params;
+  const { q } = await searchParams;
+  const query = q?.trim().slice(0, 80) ?? "";
   const supabase = await createClient();
 
   const {
@@ -54,6 +62,7 @@ export default async function PublicRestaurantPage({
       accepts_pickup,
       accepts_dine_in,
       accepts_reservations,
+      timezone,
       status
     `)
     .eq("slug", slug)
@@ -73,6 +82,8 @@ export default async function PublicRestaurantPage({
   const [
     { data: categories, error: categoriesError },
     { data: products, error: productsError },
+    { data: businessHours },
+    { data: settings },
   ] = await Promise.all([
     supabase
       .from("categories")
@@ -98,7 +109,13 @@ export default async function PublicRestaurantPage({
         image_url,
         price,
         preparation_minutes,
-        sort_order
+        sort_order,
+        product_variants (
+          price,
+          is_active,
+          is_available,
+          sort_order
+        )
       `)
       .eq("restaurant_id", restaurant.id)
       .eq("is_active", true)
@@ -106,6 +123,15 @@ export default async function PublicRestaurantPage({
       .order("sort_order", {
         ascending: true,
       }),
+    supabase
+      .from("business_hours")
+      .select("day_of_week, opens_at, closes_at, is_closed")
+      .eq("restaurant_id", restaurant.id),
+    supabase
+      .from("restaurant_settings")
+      .select("default_preparation_minutes, primary_color, secondary_color")
+      .eq("restaurant_id", restaurant.id)
+      .maybeSingle(),
   ]);
 
   if (categoriesError) {
@@ -134,9 +160,22 @@ export default async function PublicRestaurantPage({
       ? "Reservas"
       : null,
   ].filter(Boolean);
+  const operatingStatus = getRestaurantOperatingStatus(
+    businessHours ?? [],
+    restaurant.timezone,
+  );
+  const visibleProducts = (products ?? []).filter((product) => {
+    if (!query) return true;
+    const term = query.toLocaleLowerCase("pt-PT");
+    return (
+      product.name.toLocaleLowerCase("pt-PT").includes(term) ||
+      product.description?.toLocaleLowerCase("pt-PT").includes(term)
+    );
+  });
 
   return (
     <main className="min-h-screen bg-zinc-50 pb-28">
+      <PublicCartButton restaurantId={restaurant.id} slug={restaurant.slug} />
       <section className="relative">
         <div className="relative h-48 w-full overflow-hidden bg-zinc-900 sm:h-64">
           {restaurant.cover_url ? (
@@ -163,7 +202,7 @@ export default async function PublicRestaurantPage({
                   src={restaurant.logo_url}
                   alt={`Logótipo ${restaurant.name}`}
                   fill
-                  className="object-cover"
+                  className="object-contain p-2"
                   sizes="112px"
                 />
               ) : (
@@ -176,8 +215,14 @@ export default async function PublicRestaurantPage({
             </div>
 
             <div className="pb-2">
-              <Badge className="mb-2 bg-emerald-500 text-white hover:bg-emerald-500">
-                Aberto
+              <Badge
+                className={`mb-2 text-white ${
+                  operatingStatus.isOpen
+                    ? "bg-emerald-500 hover:bg-emerald-500"
+                    : "bg-zinc-500 hover:bg-zinc-500"
+                }`}
+              >
+                {operatingStatus.label}
               </Badge>
 
               <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">
@@ -209,7 +254,7 @@ export default async function PublicRestaurantPage({
 
               <span className="flex items-center gap-1.5">
                 <Clock3 className="size-4" />
-                25-35 min
+                {settings?.default_preparation_minutes ?? 30} min
               </span>
             </div>
 
@@ -226,22 +271,35 @@ export default async function PublicRestaurantPage({
                 ))}
               </div>
             )}
+
+            {restaurant.accepts_reservations && (
+              <Button
+                render={<Link href={`/r/${restaurant.slug}/reservar`} />}
+                className="mt-1 gap-2 rounded-xl bg-zinc-950 hover:bg-zinc-800"
+                style={{ backgroundColor: settings?.secondary_color ?? "#18181b" }}
+              >
+                <CalendarDays className="size-4" />
+                Reservar uma mesa
+              </Button>
+            )}
           </div>
 
-          <div className="relative mt-6">
-            <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-zinc-400" />
-
+          <form className="relative mt-6">
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-zinc-400" />
             <Input
+              type="search"
+              name="q"
+              defaultValue={query}
+              aria-label="Pesquisar no menu"
               placeholder="Pesquisar no menu"
               className="h-12 rounded-2xl border-zinc-200 bg-white pl-12 shadow-sm"
-              readOnly
             />
-          </div>
+          </form>
         </div>
       </section>
 
       <div className="mx-auto max-w-5xl px-4">
-        {categories && categories.length > 0 && (
+        {!query && categories && categories.length > 0 && (
           <nav className="mt-8 flex gap-2 overflow-x-auto pb-2">
             {categories.map((category) => (
               <a
@@ -255,7 +313,7 @@ export default async function PublicRestaurantPage({
           </nav>
         )}
 
-        {!products?.length ? (
+        {!visibleProducts.length ? (
           <Card className="mt-10 border-dashed shadow-none">
             <CardContent className="flex min-h-64 flex-col items-center justify-center text-center">
               <ShoppingBag className="size-8 text-zinc-300" />
@@ -265,7 +323,9 @@ export default async function PublicRestaurantPage({
               </p>
 
               <p className="mt-1 text-sm text-zinc-500">
-                Ainda não existem produtos disponíveis.
+                {query
+                  ? `Não encontrámos produtos para “${query}”.`
+                  : "Ainda não existem produtos disponíveis."}
               </p>
             </CardContent>
           </Card>
@@ -274,7 +334,7 @@ export default async function PublicRestaurantPage({
             {(categories ?? []).map(
               (category) => {
                 const categoryProducts =
-                  products.filter(
+                  visibleProducts.filter(
                     (product) =>
                       product.category_id ===
                       category.id
@@ -327,8 +387,9 @@ export default async function PublicRestaurantPage({
 
                                   <div className="mt-auto pt-5">
                                     <p className="text-lg font-semibold text-zinc-950">
+                                      {product.product_variants.length > 0 && <span className="mr-1 text-xs font-normal text-zinc-500">A partir de</span>}
                                       {formatMoney(
-                                        product.price,
+                                        product.product_variants.length > 0 ? Math.min(...product.product_variants.map((variant) => variant.price)) : product.price,
                                         restaurant.currency_code
                                       )}
                                     </p>
@@ -362,7 +423,7 @@ export default async function PublicRestaurantPage({
                                   )}
 
                                   <div className="absolute bottom-2 right-2 flex size-9 items-center justify-center rounded-full bg-white text-xl font-medium text-zinc-950 shadow-md">
-                                    +
+                                    <span style={{ color: settings?.primary_color ?? "#fbbf24" }}>+</span>
                                   </div>
                                 </div>
                               </div>
@@ -376,7 +437,7 @@ export default async function PublicRestaurantPage({
               }
             )}
 
-            {products.some(
+            {visibleProducts.some(
               (product) =>
                 product.category_id === null
             ) && (
@@ -386,7 +447,7 @@ export default async function PublicRestaurantPage({
                 </h2>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {products
+                  {visibleProducts
                     .filter(
                       (product) =>
                         product.category_id ===
@@ -404,8 +465,9 @@ export default async function PublicRestaurantPage({
                             </h3>
 
                             <p className="mt-3 font-semibold">
+                              {product.product_variants.length > 0 && <span className="mr-1 text-xs font-normal text-zinc-500">A partir de</span>}
                               {formatMoney(
-                                product.price,
+                                product.product_variants.length > 0 ? Math.min(...product.product_variants.map((variant) => variant.price)) : product.price,
                                 restaurant.currency_code
                               )}
                             </p>

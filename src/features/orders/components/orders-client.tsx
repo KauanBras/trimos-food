@@ -6,9 +6,7 @@ import {
   Bike,
   Check,
   Clock3,
-  MoreHorizontal,
   PackageCheck,
-  Plus,
   Search,
   ShoppingBag,
   Utensils,
@@ -35,6 +33,7 @@ import {
 } from "@/components/ui/tabs";
 import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/database";
+import type { Json } from "@/types/database";
 
 type DatabaseOrderStatus =
   Database["public"]["Enums"]["order_status"];
@@ -45,6 +44,8 @@ type OrderItem = {
   quantity: number;
   unit_price: number;
   notes: string | null;
+  variant_name: string | null;
+  selected_modifiers: Json;
 };
 
 export type RestaurantOrder = {
@@ -64,6 +65,7 @@ export type RestaurantOrder = {
 type OrdersClientProps = {
   restaurantId: string;
   initialOrders: RestaurantOrder[];
+  currencyCode: string;
 };
 
 const statusConfig: Record<
@@ -116,10 +118,10 @@ const statusConfig: Record<
   },
 };
 
-function formatMoney(value: number) {
+function formatMoney(value: number, currencyCode: string) {
   return new Intl.NumberFormat("pt-PT", {
     style: "currency",
-    currency: "EUR",
+    currency: currencyCode,
   }).format(value);
 }
 
@@ -145,11 +147,11 @@ function getInitials(name: string) {
 export function OrdersClient({
   restaurantId,
   initialOrders,
+  currencyCode,
 }: OrdersClientProps) {
   const supabase = useMemo(() => createClient(), []);
   const [orders, setOrders] = useState(initialOrders);
   const [search, setSearch] = useState("");
-  const [creating, setCreating] = useState(false);
 
   async function fetchOrder(orderId: string) {
     const { data, error } = await supabase
@@ -170,7 +172,9 @@ export function OrdersClient({
           product_name,
           quantity,
           unit_price,
-          notes
+          notes,
+          variant_name,
+          selected_modifiers
         )
       `)
       .eq("id", orderId)
@@ -207,7 +211,7 @@ export function OrdersClient({
           ]);
 
           toast.success("Novo pedido recebido", {
-            description: `${order.customer_name} · ${formatMoney(order.total)}`,
+            description: `${order.customer_name} · ${formatMoney(order.total, currencyCode)}`,
           });
 
         }
@@ -248,7 +252,9 @@ export function OrdersClient({
       .update({
         status,
         accepted_at:
-          status === "confirmed" ? new Date().toISOString() : undefined,
+          status === "confirmed" || status === "preparing"
+            ? new Date().toISOString()
+            : undefined,
         ready_at: status === "ready" ? new Date().toISOString() : undefined,
         completed_at:
           status === "completed" ? new Date().toISOString() : undefined,
@@ -271,75 +277,6 @@ export function OrdersClient({
       )
     );
   }
-
-  async function createTestOrder() {
-    setCreating(true);
-
-    const randomNumber = Math.floor(Math.random() * 900) + 100;
-
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .insert({
-        restaurant_id: restaurantId,
-        customer_name: `Cliente Teste ${randomNumber}`,
-        customer_phone: "912345678",
-        type: "delivery",
-        status: "new",
-        subtotal: 34.9,
-        delivery_fee: 2.5,
-        total: 37.4,
-        delivery_address: "Covilhã, Portugal",
-        estimated_minutes: 30,
-      })
-      .select("id")
-      .single();
-
-    if (orderError || !order) {
-      toast.error("Não foi possível criar o pedido", {
-        description: orderError?.message,
-      });
-      setCreating(false);
-      return;
-    }
-
-    const { error: itemsError } = await supabase.from("order_items").insert([
-      {
-        order_id: order.id,
-        product_name: "Combo Hiro 44 peças",
-        quantity: 1,
-        unit_price: 32.9,
-        notes: "Sem gengibre",
-      },
-      {
-        order_id: order.id,
-        product_name: "Coca-Cola",
-        quantity: 1,
-        unit_price: 2,
-      },
-    ]);
-
-    setCreating(false);
-
-    if (itemsError) {
-      toast.error("Pedido criado, mas os artigos falharam", {
-        description: itemsError.message,
-      });
-      return;
-    }
-
-    const fullOrder = await fetchOrder(order.id);
-
-    if (fullOrder) {
-      setOrders((current) => [
-        fullOrder,
-        ...current.filter((item) => item.id !== fullOrder.id),
-      ]);
-    }
-
-    toast.success("Pedido de teste criado");
-  }
-
-
 
   const filteredOrders = orders.filter((order) => {
     const term = search.toLowerCase();
@@ -414,7 +351,7 @@ export function OrdersClient({
                           ? "Recolha"
                           : "Mesa"}
                       {" · "}
-                      {formatMoney(order.total)}
+                      {formatMoney(order.total, currencyCode)}
                       {" · "}
                       {formatCreatedAt(order.created_at)}
                     </p>
@@ -423,6 +360,8 @@ export function OrdersClient({
                       {order.order_items.map((item) => (
                         <p key={item.id} className="text-sm text-zinc-700">
                           {item.quantity}x {item.product_name}
+                          {item.variant_name ? ` · ${item.variant_name}` : ""}
+                          {Array.isArray(item.selected_modifiers) && item.selected_modifiers.map((modifier) => typeof modifier === "object" && modifier && "option" in modifier ? `${"quantity" in modifier ? Number(modifier.quantity) : 1}x ${String(modifier.option)}` : "").filter(Boolean).length > 0 ? ` · ${item.selected_modifiers.map((modifier) => typeof modifier === "object" && modifier && "option" in modifier ? `${"quantity" in modifier ? Number(modifier.quantity) : 1}x ${String(modifier.option)}` : "").filter(Boolean).join(", ")}` : ""}
                           {item.notes ? ` · ${item.notes}` : ""}
                         </p>
                       ))}
@@ -520,9 +459,6 @@ export function OrdersClient({
                       </Badge>
                     )}
 
-                    <Button variant="outline" size="icon">
-                      <MoreHorizontal className="size-4" />
-                    </Button>
                   </div>
                 </div>
 
@@ -578,14 +514,6 @@ export function OrdersClient({
             />
           </div>
 
-          <Button
-            className="h-11 gap-2 bg-zinc-950 hover:bg-zinc-800"
-            onClick={createTestOrder}
-            disabled={creating}
-          >
-            <Plus className="size-4" />
-            {creating ? "A criar..." : "Pedido de teste"}
-          </Button>
         </div>
       </section>
 

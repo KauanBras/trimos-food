@@ -36,7 +36,7 @@ export default function AuthLayout({
         </div>
 
         <p className="text-sm text-zinc-500">
-          Trimos Food · Hirotatsu Sushi
+          Trimos Food · Operação inteligente para restaurantes
         </p>
       </section>
 

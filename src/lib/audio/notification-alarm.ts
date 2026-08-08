@@ -3,6 +3,8 @@ type AlarmType = "restaurant" | "driver";
 let audioContext: AudioContext | null = null;
 let alarmInterval: ReturnType<typeof setInterval> | null = null;
 let currentAlarm: AlarmType | null = null;
+let unlockInFlight: Promise<boolean> | null = null;
+const activeAlarmOscillators = new Set<OscillatorNode>();
 
 function getAudioContext() {
   if (typeof window === "undefined") {
@@ -35,8 +37,16 @@ async function ensureAudioReady() {
     throw new Error("O navegador não suporta notificações sonoras.");
   }
 
-  if (context.state === "suspended") {
+  if (context.state === "closed") {
+    throw new Error("O áudio do navegador foi encerrado.");
+  }
+
+  if (context.state !== "running") {
     await context.resume();
+  }
+
+  if (context.state !== "running") {
+    throw new Error("O navegador manteve o áudio suspenso.");
   }
 
   return context;
@@ -46,7 +56,9 @@ function playTone(
   frequency: number,
   duration: number,
   delay = 0,
-  volume = 0.35
+  volume = 0.35,
+  type: OscillatorType = "sine",
+  trackForAlarm = false,
 ) {
   const context = getAudioContext();
 
@@ -59,47 +71,65 @@ function playTone(
   const startTime = context.currentTime + delay;
   const endTime = startTime + duration;
 
-  oscillator.type = "sine";
+  oscillator.type = type;
   oscillator.frequency.setValueAtTime(frequency, startTime);
 
   gain.gain.setValueAtTime(0.0001, startTime);
-  gain.gain.exponentialRampToValueAtTime(
-    volume,
-    startTime + 0.02
-  );
-  gain.gain.exponentialRampToValueAtTime(
-    0.0001,
-    endTime
-  );
+  gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
 
   oscillator.connect(gain);
   gain.connect(context.destination);
+
+  if (trackForAlarm) {
+    activeAlarmOscillators.add(oscillator);
+  }
+
+  oscillator.addEventListener(
+    "ended",
+    () => {
+      activeAlarmOscillators.delete(oscillator);
+      oscillator.disconnect();
+      gain.disconnect();
+    },
+    { once: true },
+  );
 
   oscillator.start(startTime);
   oscillator.stop(endTime);
 }
 
-function playRestaurantPattern() {
-  playTone(880, 0.3, 0);
-  playTone(1100, 0.3, 0.38);
-  playTone(880, 0.3, 0.76);
+function playRestaurantPattern(trackForAlarm = false) {
+  playTone(440, 0.5, 0, 0.1, "sine", trackForAlarm);
+  playTone(554.37, 0.56, 0.62, 0.09, "sine", trackForAlarm);
+  playTone(659.25, 0.68, 1.28, 0.08, "sine", trackForAlarm);
 }
 
-function playDriverPattern() {
-  playTone(660, 0.25, 0);
-  playTone(880, 0.25, 0.32);
-  playTone(1100, 0.35, 0.64);
+function playDriverPattern(trackForAlarm = false) {
+  playTone(660, 0.25, 0, 0.35, "sine", trackForAlarm);
+  playTone(880, 0.25, 0.32, 0.35, "sine", trackForAlarm);
+  playTone(1100, 0.35, 0.64, 0.35, "sine", trackForAlarm);
 }
 
-export async function unlockNotificationAudio() {
-  const wasRunning = getAudioContext()?.state === "running";
+async function performAudioUnlock() {
   const context = await ensureAudioReady();
-
-  if (!wasRunning) {
-    playTone(880, 0.18);
-  }
+  playRestaurantPattern();
 
   return context.state === "running";
+}
+
+export function unlockNotificationAudio() {
+  if (!unlockInFlight) {
+    unlockInFlight = performAudioUnlock().finally(() => {
+      unlockInFlight = null;
+    });
+  }
+
+  return unlockInFlight;
+}
+
+export function isNotificationAudioReady() {
+  return getAudioContext()?.state === "running";
 }
 
 export function startNotificationAlarm(type: AlarmType) {
@@ -112,24 +142,29 @@ export function startNotificationAlarm(type: AlarmType) {
   currentAlarm = type;
 
   const playPattern =
-    type === "restaurant"
-      ? playRestaurantPattern
-      : playDriverPattern;
+    type === "restaurant" ? playRestaurantPattern : playDriverPattern;
 
   const playWhenReady = async () => {
     try {
       await ensureAudioReady();
-      playPattern();
+      if (type === "restaurant") {
+        playRestaurantPattern(true);
+      } else {
+        playPattern(true);
+      }
     } catch (error) {
-      console.error("Não foi possível tocar o alarme:", error);
+      console.warn("Não foi possível tocar o alarme:", error);
     }
   };
 
   void playWhenReady();
 
-  alarmInterval = setInterval(() => {
-    void playWhenReady();
-  }, 2800);
+  alarmInterval = setInterval(
+    () => {
+      void playWhenReady();
+    },
+    type === "restaurant" ? 6500 : 2800,
+  );
 }
 
 export function stopNotificationAlarm() {
@@ -139,4 +174,13 @@ export function stopNotificationAlarm() {
 
   alarmInterval = null;
   currentAlarm = null;
+
+  for (const oscillator of activeAlarmOscillators) {
+    try {
+      oscillator.stop();
+    } catch {
+      // O oscilador pode já ter terminado entre a verificação e a paragem.
+    }
+  }
+  activeAlarmOscillators.clear();
 }
