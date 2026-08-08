@@ -8,6 +8,7 @@ import {
   CalendarDays,
   ChefHat,
   ClipboardList,
+  ExternalLink,
   LayoutDashboard,
   LogOut,
   Package,
@@ -43,6 +44,7 @@ const roleLabels: Record<string, string> = {
 
 type RestaurantSidebarProps = {
   restaurantName: string;
+  restaurantSlug: string;
   restaurantLogoUrl: string | null;
   isOpen: boolean;
   userName: string;
@@ -63,6 +65,7 @@ function initials(value: string) {
 
 export function RestaurantSidebar({
   restaurantName,
+  restaurantSlug,
   restaurantLogoUrl,
   isOpen,
   userName,
@@ -161,6 +164,18 @@ export function RestaurantSidebar({
           );
         })}
       </nav>
+
+      <div className="px-3 pt-3">
+        <Link
+          href={`/r/${restaurantSlug}`}
+          target="_blank"
+          className="flex items-center gap-3 rounded-xl border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-zinc-950"
+        >
+          <Store className="size-[18px] text-amber-600" />
+          <span className="flex-1">Menu dos clientes</span>
+          <ExternalLink className="size-4 text-zinc-400" />
+        </Link>
+      </div>
 
       <div className="m-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
         <div className="flex items-center gap-2 text-amber-900">

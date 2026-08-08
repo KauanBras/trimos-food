@@ -18,6 +18,7 @@ import { RestaurantSidebar } from "@/components/layout/restaurant-sidebar";
 
 type RestaurantTopbarProps = {
   restaurantName: string;
+  restaurantSlug: string;
   restaurantLogoUrl: string | null;
   operatingLabel: string;
   isOpen: boolean;

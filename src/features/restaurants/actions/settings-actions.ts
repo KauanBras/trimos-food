@@ -80,7 +80,7 @@ export async function updateRestaurantSettingsAction(
       };
     }
 
-    const name = textValue(formData, "name");
+    const name = textValue(formData, "name") || restaurant.name;
     if (name.length < 2) {
       return { ok: false, message: "Indique o nome do restaurante." };
     }

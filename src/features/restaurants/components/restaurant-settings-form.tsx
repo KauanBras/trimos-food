@@ -3,6 +3,8 @@
 import { useMemo, useState, useTransition } from "react";
 import {
   Clock3,
+  Copy,
+  ExternalLink,
   ImageIcon,
   LoaderCircle,
   MapPin,
@@ -119,8 +121,46 @@ export function RestaurantSettingsForm({
     });
   }
 
+  async function copyPublicMenuLink() {
+    const publicMenuLink = `${window.location.origin}/r/${restaurant.slug}`;
+
+    try {
+      await navigator.clipboard.writeText(publicMenuLink);
+      toast.success("Link do menu copiado.");
+    } catch {
+      toast.error("Não foi possível copiar o link.");
+    }
+  }
+
   return (
     <form onSubmit={submit} className="space-y-6">
+      <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-white shadow-none">
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-zinc-950">Link para os clientes</p>
+            <p className="mt-1 truncate text-sm text-zinc-600">
+              /r/{restaurant.slug}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Partilhe este endereço no Instagram, WhatsApp, Google ou num QR Code.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" className="gap-2" onClick={() => void copyPublicMenuLink()}>
+              <Copy className="size-4" /> Copiar link
+            </Button>
+            <Button
+              type="button"
+              className="gap-2 bg-zinc-950 hover:bg-zinc-800"
+              render={<a href={`/r/${restaurant.slug}`} target="_blank" rel="noreferrer" />}
+            >
+              <ExternalLink className="size-4" /> Abrir menu
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="identity" className="space-y-6">
         <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-2xl bg-zinc-100 p-1">
           <TabsTrigger value="identity" className="gap-2">
@@ -137,7 +177,7 @@ export function RestaurantSettingsForm({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="identity" className="space-y-6">
+        <TabsContent value="identity" keepMounted className="space-y-6">
           <Card className="overflow-hidden border-zinc-200 shadow-none">
             <div
               className="relative h-52 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-700 bg-cover bg-center"
@@ -273,7 +313,7 @@ export function RestaurantSettingsForm({
           </Card>
         </TabsContent>
 
-        <TabsContent value="operation" className="space-y-6">
+        <TabsContent value="operation" keepMounted className="space-y-6">
           <Card className="border-zinc-200 shadow-none">
             <CardHeader><CardTitle className="text-lg">Canais de venda</CardTitle></CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -318,7 +358,7 @@ export function RestaurantSettingsForm({
           </Card>
         </TabsContent>
 
-        <TabsContent value="reservations">
+        <TabsContent value="reservations" keepMounted>
           <Card className="border-zinc-200 shadow-none">
             <CardHeader><CardTitle className="text-lg">Regras das reservas</CardTitle></CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2">
@@ -344,7 +384,7 @@ export function RestaurantSettingsForm({
           </Card>
         </TabsContent>
 
-        <TabsContent value="hours">
+        <TabsContent value="hours" keepMounted>
           <Card className="border-zinc-200 shadow-none">
             <CardHeader><CardTitle className="text-lg">Horário semanal</CardTitle></CardHeader>
             <CardContent className="space-y-3">

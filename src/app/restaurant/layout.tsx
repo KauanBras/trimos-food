@@ -23,7 +23,7 @@ export default async function RestaurantLayout({
 
   const { data: membership } = await supabase
     .from("restaurant_users")
-    .select("restaurant_id, role, restaurants(name, logo_url, timezone)")
+    .select("restaurant_id, role, restaurants(name, slug, logo_url, timezone)")
     .eq("user_id", user.id)
     .eq("is_active", true)
     .maybeSingle();
@@ -67,6 +67,7 @@ export default async function RestaurantLayout({
     "Utilizador";
   const navigationProps = {
     restaurantName: restaurant.name,
+    restaurantSlug: restaurant.slug,
     restaurantLogoUrl: restaurant.logo_url,
     isOpen: operatingStatus.isOpen,
     operatingLabel: operatingStatus.label,
