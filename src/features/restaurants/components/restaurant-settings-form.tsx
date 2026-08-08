@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import {
+  CircleAlert,
+  CircleCheckBig,
   Clock3,
   Copy,
   ExternalLink,
@@ -163,6 +165,32 @@ export function RestaurantSettingsForm({
       ),
     [weeklySchedule],
   );
+  const setupChecks = [
+    { label: "Logótipo", complete: Boolean(restaurant.logo_url) },
+    { label: "Capa", complete: Boolean(restaurant.cover_url) },
+    { label: "Descrição pública", complete: Boolean(restaurant.description?.trim()) },
+    { label: "E-mail", complete: Boolean(restaurant.email?.trim()) },
+    { label: "NIF", complete: Boolean(restaurant.tax_number?.trim()) },
+    {
+      label: "Morada completa",
+      complete: Boolean(
+        restaurant.address_line?.trim()
+        && restaurant.city?.trim()
+        && restaurant.postal_code?.trim(),
+      ),
+    },
+    {
+      label: "Ponto de partida das entregas",
+      complete:
+        !restaurant.accepts_delivery
+        || (deliveryOrigin.latitude !== null && deliveryOrigin.longitude !== null),
+    },
+    {
+      label: "Horário semanal",
+      complete: weeklySchedule.some((day) => day.isOpen),
+    },
+  ];
+  const missingSetup = setupChecks.filter((item) => !item.complete);
 
   function previewFile(
     file: File | undefined,
@@ -228,6 +256,37 @@ export function RestaurantSettingsForm({
 
   return (
     <form onSubmit={submit} className="space-y-6">
+      <Card className={missingSetup.length ? "border-amber-200 bg-amber-50/60 shadow-none" : "border-emerald-200 bg-emerald-50/60 shadow-none"}>
+        <CardContent className="p-5">
+          <div className="flex items-start gap-3">
+            {missingSetup.length ? (
+              <CircleAlert className="mt-0.5 size-5 shrink-0 text-amber-700" />
+            ) : (
+              <CircleCheckBig className="mt-0.5 size-5 shrink-0 text-emerald-700" />
+            )}
+            <div>
+              <p className="font-semibold text-zinc-950">
+                {missingSetup.length ? "Configuração comercial incompleta" : "Restaurante pronto para operar"}
+              </p>
+              <p className="mt-1 text-sm text-zinc-600">
+                {missingSetup.length
+                  ? `Faltam ${missingSetup.length} dados antes da divulgação oficial.`
+                  : "A identidade, a morada e a operação essencial estão configuradas."}
+              </p>
+              {missingSetup.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {missingSetup.map((item) => (
+                    <span key={item.label} className="rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-medium text-amber-800">
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-white shadow-none">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
@@ -248,6 +307,7 @@ export function RestaurantSettingsForm({
               type="button"
               className="gap-2 bg-zinc-950 hover:bg-zinc-800"
               render={<a href={`/r/${restaurant.slug}`} target="_blank" rel="noreferrer" />}
+              nativeButton={false}
             >
               <ExternalLink className="size-4" /> Abrir menu
             </Button>

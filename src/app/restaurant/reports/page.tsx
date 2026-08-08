@@ -56,7 +56,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <section className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div><p className="text-sm font-medium text-amber-600">Inteligência do negócio</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Relatórios</h1><p className="mt-2 text-sm text-zinc-500">Vendas, procura, reservas e desempenho dos produtos com dados reais.</p></div>
-        <div className="flex rounded-xl border border-zinc-200 bg-white p-1">{[7, 30, 90].map((value) => <Button key={value} render={<Link href={`/restaurant/reports?period=${value}`} />} size="sm" variant={period === value ? "default" : "ghost"}>{value} dias</Button>)}</div>
+        <div className="flex rounded-xl border border-zinc-200 bg-white p-1">{[7, 30, 90].map((value) => <Button key={value} render={<Link href={`/restaurant/reports?period=${value}`} />} nativeButton={false} size="sm" variant={period === value ? "default" : "ghost"}>{value} dias</Button>)}</div>
       </section>
       <ReportsDashboard currencyCode={restaurant.currency_code} days={days} topProducts={topProducts} metrics={{ revenue, orders: validOrders.length, averageTicket: validOrders.length ? revenue / validOrders.length : 0, completedRate: orders.length ? (completed / orders.length) * 100 : 0, reservations: validReservations.length, guests: validReservations.reduce((sum, item) => sum + item.party_size, 0) }} />
     </div>

@@ -95,7 +95,7 @@ export function PublicReservationStatus({
       {currentTableLabel && <p className="mt-4 text-sm text-zinc-600">Mesa atribuída: <strong>{currentTableLabel}</strong></p>}
       <p className="mt-6 text-sm leading-6 text-zinc-500">Guarde este endereço para consultar o estado da reserva.</p>
       <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-        <Button render={<Link href={`/r/${slug}`} />} variant="outline">Voltar ao restaurante</Button>
+        <Button render={<Link href={`/r/${slug}`} />} nativeButton={false} variant="outline">Voltar ao restaurante</Button>
         {["pending", "confirmed"].includes(status) && <Button type="button" variant="outline" className="text-red-600" disabled={cancelling} onClick={cancel}>{cancelling ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <X className="mr-2 size-4" />}Cancelar reserva</Button>}
       </div>
     </div>

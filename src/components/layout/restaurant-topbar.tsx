@@ -87,6 +87,7 @@ export function RestaurantTopbar(props: RestaurantTopbarProps) {
 
           <Button
             render={<Link href="/restaurant/orders" />}
+            nativeButton={false}
             variant="outline"
             className="hidden gap-2 rounded-xl sm:flex"
           >
@@ -96,6 +97,7 @@ export function RestaurantTopbar(props: RestaurantTopbarProps) {
 
           <Button
             render={<Link href="/restaurant/orders" aria-label="Ver novos pedidos" />}
+            nativeButton={false}
             variant="outline"
             size="icon"
             className="relative rounded-xl"

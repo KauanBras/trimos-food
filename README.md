@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Trimos Food
 
-## Getting Started
+Plataforma multi-restaurante para pedidos, cozinha, entregas, estafetas, reservas, clientes, catálogo e relatórios em tempo real.
 
-First, run the development server:
+## Módulos disponíveis
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Painel operacional e pesquisa global
+- Pedidos com alarme contínuo, aceitação e acompanhamento de estado
+- Ecrã de cozinha
+- Produtos, categorias, imagens, variações e complementos reutilizáveis
+- Quantidade por complemento, limites mínimos e máximos
+- Ordenação e disponibilidade rápida do menu
+- Menu público, carrinho e acompanhamento do pedido
+- Taxa automática por distância e bloqueio fora do raio
+- Reservas com capacidade, sobreposição, duração e confirmação
+- CRM de clientes
+- Convites e aplicação móvel dos estafetas
+- Distribuição automática de entregas e notificações push
+- Relatórios operacionais
+- Identidade, capa, logótipo, serviços e horários partidos
+- Onboarding isolado por restaurante
+
+## Ambiente local
+
+Crie `.env.local` com:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Depois execute:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Base de dados
 
-## Learn More
+As alterações estão versionadas em `supabase/migrations`.
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npx supabase db push --dry-run
+npx supabase db push
+npx supabase db lint --linked
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+A função `send-driver-push` necessita dos segredos `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY` no Supabase.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Qualidade
 
-## Deploy on Vercel
+```bash
+npm run lint
+npm run build
+npm run test:e2e
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Os testes E2E executam os fluxos públicos em Chromium e WebKit móvel. Para testar uma publicação externa:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+E2E_BASE_URL=https://trimos-food.vercel.app npm run test:e2e
+```
+
+O GitHub Actions repete a compilação e os testes de produção em cada envio para `main`.
+
+## Operação
+
+- Saúde: `/api/health`
+- Menu público: `/r/[slug]`
+- Painel do restaurante: `/restaurant/dashboard`
+- Aplicação do estafeta: `/driver/dashboard`
+
+Antes de divulgar um novo restaurante, complete o cartão de prontidão em **Configurações**: identidade, contacto, NIF, morada, localização das entregas e horário semanal.
+
+Os pedidos atuais usam pagamento na entrega ou no levantamento. Um gateway de pagamento online deve ser ativado somente depois da escolha do fornecedor e da configuração das credenciais comerciais.

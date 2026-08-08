@@ -278,6 +278,7 @@ export default async function RestaurantDashboardPage() {
           <div className="flex flex-wrap gap-3">
             <Button
               render={<Link href="/restaurant/reservations" />}
+              nativeButton={false}
               variant="outline"
               className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
             >
@@ -285,6 +286,7 @@ export default async function RestaurantDashboardPage() {
             </Button>
             <Button
               render={<Link href="/restaurant/orders" />}
+              nativeButton={false}
               className="gap-2 bg-amber-400 text-zinc-950 hover:bg-amber-300"
             >
               Abrir modo operação
@@ -335,7 +337,7 @@ export default async function RestaurantDashboardPage() {
               </div>
               <p className="mt-1 text-sm text-zinc-500">Pedidos mais recentes recebidos pelo restaurante.</p>
             </div>
-            <Button render={<Link href="/restaurant/orders" />} variant="ghost" size="sm" className="gap-2">
+            <Button render={<Link href="/restaurant/orders" />} nativeButton={false} variant="ghost" size="sm" className="gap-2">
               Ver todos<ChevronRight className="size-4" />
             </Button>
           </CardHeader>
@@ -405,7 +407,7 @@ export default async function RestaurantDashboardPage() {
                   )}
                 </div>
               </div>
-              <Button render={<Link href="/restaurant/reservations" />} variant="outline" className="mt-5 w-full border-amber-300 bg-white/70">Ver reservas</Button>
+              <Button render={<Link href="/restaurant/reservations" />} nativeButton={false} variant="outline" className="mt-5 w-full border-amber-300 bg-white/70">Ver reservas</Button>
             </CardContent>
           </Card>
         </div>
@@ -415,7 +417,7 @@ export default async function RestaurantDashboardPage() {
         <Card className="border-zinc-200 shadow-none">
           <CardHeader className="flex flex-row items-center justify-between">
             <div><CardTitle className="text-lg">Cozinha</CardTitle><p className="mt-1 text-sm text-zinc-500">Progresso dos pedidos em preparação.</p></div>
-            <Button render={<Link href="/restaurant/kitchen" />} variant="outline" size="sm">Abrir cozinha</Button>
+            <Button render={<Link href="/restaurant/kitchen" />} nativeButton={false} variant="outline" size="sm">Abrir cozinha</Button>
           </CardHeader>
           <CardContent className="space-y-5">
             {kitchenOrders.length === 0 ? (
@@ -451,7 +453,7 @@ export default async function RestaurantDashboardPage() {
               <div className="rounded-2xl bg-zinc-50 p-4"><p className="text-xl font-semibold">{completedToday}</p><p className="mt-1 text-xs text-zinc-500">Concluídos</p></div>
               <div className="rounded-2xl bg-zinc-50 p-4"><p className="text-xl font-semibold">{averagePreparation ? `${averagePreparation}m` : "—"}</p><p className="mt-1 text-xs text-zinc-500">Preparação</p></div>
             </div>
-            <Button render={<Link href="/restaurant/reports" />} variant="outline" className="w-full">Abrir relatórios</Button>
+            <Button render={<Link href="/restaurant/reports" />} nativeButton={false} variant="outline" className="w-full">Abrir relatórios</Button>
           </CardContent>
         </Card>
       </section>

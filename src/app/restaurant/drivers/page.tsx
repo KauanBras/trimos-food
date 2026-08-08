@@ -11,5 +11,5 @@ export default async function RestaurantDriversPage() {
   ]);
   if (driversResult.error) throw new Error(`Não foi possível carregar os estafetas: ${driversResult.error.message}`);
   if (invitesResult.error) throw new Error(`Não foi possível carregar os convites: ${invitesResult.error.message}`);
-  return <RestaurantDriversClient initialDrivers={driversResult.data ?? []} initialInvites={invitesResult.data ?? []} />;
+  return <RestaurantDriversClient initialDrivers={driversResult.data ?? []} initialInvites={invitesResult.data ?? []} initialNow={new Date().toISOString()} />;
 }

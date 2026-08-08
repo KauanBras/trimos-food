@@ -275,6 +275,7 @@ export default async function PublicRestaurantPage({
             {restaurant.accepts_reservations && (
               <Button
                 render={<Link href={`/r/${restaurant.slug}/reservar`} />}
+                nativeButton={false}
                 className="mt-1 gap-2 rounded-xl bg-zinc-950 hover:bg-zinc-800"
                 style={{ backgroundColor: settings?.secondary_color ?? "#18181b" }}
               >

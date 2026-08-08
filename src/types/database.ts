@@ -164,6 +164,7 @@ export type Database = {
           offered_driver_id: string | null
           order_id: string
           picked_up_at: string | null
+          push_notified_at: string | null
           restaurant_id: string
           status: Database["public"]["Enums"]["delivery_status"]
           updated_at: string
@@ -185,6 +186,7 @@ export type Database = {
           offered_driver_id?: string | null
           order_id: string
           picked_up_at?: string | null
+          push_notified_at?: string | null
           restaurant_id: string
           status?: Database["public"]["Enums"]["delivery_status"]
           updated_at?: string
@@ -206,6 +208,7 @@ export type Database = {
           offered_driver_id?: string | null
           order_id?: string
           picked_up_at?: string | null
+          push_notified_at?: string | null
           restaurant_id?: string
           status?: Database["public"]["Enums"]["delivery_status"]
           updated_at?: string
@@ -1294,6 +1297,13 @@ export type Database = {
         }[]
       }
       get_public_checkout_settings: { Args: { requested_restaurant_id: string }; Returns: Json }
+      get_public_reservation_settings: {
+        Args: { requested_restaurant_id: string }
+        Returns: {
+          reservation_advance_days: number
+          reservation_slot_minutes: number
+        }[]
+      }
       get_public_order_status: { Args: { requested_order_id: string; requested_order_token: string }; Returns: Json }
       get_public_reservation_status: {
         Args: {

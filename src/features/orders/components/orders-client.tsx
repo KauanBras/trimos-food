@@ -133,6 +133,7 @@ function formatCreatedAt(value: string) {
   return new Intl.DateTimeFormat("pt-PT", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Lisbon",
   }).format(new Date(value));
 }
 
