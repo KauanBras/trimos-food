@@ -11,6 +11,8 @@ export default async function KitchenServerPage() {
     .select(`
       id,
       customer_name,
+      type,
+      table_label,
       status,
       estimated_minutes,
       accepted_at,

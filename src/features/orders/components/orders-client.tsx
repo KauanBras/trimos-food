@@ -53,6 +53,7 @@ export type RestaurantOrder = {
   id: string;
   customer_name: string;
   customer_phone: string | null;
+  table_label: string | null;
   type: Database["public"]["Enums"]["order_type"];
   status: DatabaseOrderStatus;
   subtotal: number;
@@ -170,6 +171,7 @@ export function OrdersClient({
         id,
         customer_name,
         customer_phone,
+        table_label,
         type,
         status,
         subtotal,
@@ -285,6 +287,7 @@ export function OrdersClient({
 
     return (
       order.customer_name.toLowerCase().includes(term) ||
+      order.table_label?.toLowerCase().includes(term) ||
       order.id.toLowerCase().includes(term)
     );
   });
@@ -351,7 +354,7 @@ export function OrdersClient({
                         ? "Entrega"
                         : order.type === "pickup"
                           ? "Recolha"
-                          : "Mesa"}
+                          : order.table_label ?? "Mesa"}
                       {" · "}
                       {formatMoney(order.total, currencyCode)}
                       {" · "}

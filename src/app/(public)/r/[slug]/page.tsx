@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Clock3,
   MapPin,
+  QrCode,
   Search,
   ShoppingBag,
 } from "lucide-react";
@@ -21,7 +22,7 @@ type PublicRestaurantPageProps = {
   params: Promise<{
     slug: string;
   }>;
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; table?: string }>;
 };
 
 function formatMoney(
@@ -39,8 +40,9 @@ export default async function PublicRestaurantPage({
   searchParams,
 }: PublicRestaurantPageProps) {
   const { slug } = await params;
-  const { q } = await searchParams;
+  const { q, table } = await searchParams;
   const query = q?.trim().slice(0, 80) ?? "";
+  const tableCode = table?.trim().toUpperCase().slice(0, 40) ?? "";
   const supabase = await createClient();
 
   const {
@@ -84,6 +86,7 @@ export default async function PublicRestaurantPage({
     { data: products, error: productsError },
     { data: businessHours },
     { data: settings },
+    { data: tableData },
   ] = await Promise.all([
     supabase
       .from("categories")
@@ -132,7 +135,16 @@ export default async function PublicRestaurantPage({
       .select("default_preparation_minutes, primary_color, secondary_color")
       .eq("restaurant_id", restaurant.id)
       .maybeSingle(),
+    tableCode
+      ? supabase.rpc("resolve_public_table", {
+          requested_restaurant_slug: restaurant.slug,
+          requested_table_code: tableCode,
+        })
+      : Promise.resolve({ data: null, error: null }),
   ]);
+
+  if (tableCode && !tableData) notFound();
+  const tableContext = tableData as { name?: string; code?: string } | null;
 
   if (categoriesError) {
     throw new Error(
@@ -175,7 +187,7 @@ export default async function PublicRestaurantPage({
 
   return (
     <main className="min-h-screen bg-zinc-50 pb-28">
-      <PublicCartButton restaurantId={restaurant.id} slug={restaurant.slug} />
+      <PublicCartButton restaurantId={restaurant.id} slug={restaurant.slug} tableCode={tableContext?.code} />
       <section className="relative">
         <div className="relative h-48 w-full overflow-hidden bg-zinc-900 sm:h-64">
           {restaurant.cover_url ? (
@@ -232,6 +244,11 @@ export default async function PublicRestaurantPage({
           </div>
 
           <div className="mt-4 space-y-3">
+            {tableContext?.name ? (
+              <div className="flex w-fit items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900">
+                <QrCode className="size-4" /> Menu de {tableContext.name}
+              </div>
+            ) : null}
             {restaurant.description && (
               <p className="max-w-2xl text-zinc-600">
                 {restaurant.description}
@@ -286,6 +303,7 @@ export default async function PublicRestaurantPage({
           </div>
 
           <form className="relative mt-6">
+            {tableContext?.code ? <input type="hidden" name="table" value={tableContext.code} /> : null}
             <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-zinc-400" />
             <Input
               type="search"
@@ -368,7 +386,7 @@ export default async function PublicRestaurantPage({
                         (product) => (
                           <Link
                             key={product.id}
-                            href={`/r/${restaurant.slug}/produto/${product.id}`}
+                            href={`/r/${restaurant.slug}/produto/${product.id}${tableContext?.code ? `?table=${encodeURIComponent(tableContext.code)}` : ""}`}
                             className="group"
                           >
                             <Card className="h-full overflow-hidden border-zinc-200 bg-white shadow-none transition hover:-translate-y-0.5 hover:shadow-md">

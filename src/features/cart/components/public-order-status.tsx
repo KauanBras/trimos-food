@@ -14,6 +14,7 @@ export type PublicOrderSummary = {
   customerName: string;
   status: string;
   type: string;
+  tableLabel: string | null;
   subtotal: number;
   deliveryFee: number;
   total: number;
@@ -107,6 +108,12 @@ export function PublicOrderStatus({
           <div className={`flex items-center justify-center gap-2 rounded-2xl p-4 ${copy.tone}`}>
             <Clock3 className="size-5" /> Tempo estimado: {order.estimatedMinutes ?? 30} minutos
           </div>
+
+          {order.tableLabel ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center font-semibold text-amber-900">
+              Pedido identificado para {order.tableLabel}
+            </div>
+          ) : null}
 
           <div className="rounded-2xl border p-4 text-sm">
             <div className="flex items-center justify-between gap-3">

@@ -1,7 +1,9 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
+import { sendDriverInviteEmail } from "@/lib/email/driver-invite";
 import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,6 +11,7 @@ export type DriverManagementResult = {
   ok: boolean;
   message: string;
   token?: string;
+  emailSent?: boolean;
 };
 
 function canManage(role: string) {
@@ -17,7 +20,7 @@ function canManage(role: string) {
 
 export async function createDriverInviteAction(email: string): Promise<DriverManagementResult> {
   try {
-    const { restaurantId, role, user } = await getCurrentRestaurant();
+    const { restaurantId, restaurant, role, user } = await getCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para convidar estafetas." };
     const normalizedEmail = email.trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) return { ok: false, message: "Indique um e-mail válido." };
@@ -36,8 +39,37 @@ export async function createDriverInviteAction(email: string): Promise<DriverMan
     }, { onConflict: "restaurant_id,email" });
 
     if (error) throw new Error(error.message);
+    const requestHeaders = await headers();
+    const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+    const protocol = requestHeaders.get("x-forwarded-proto")
+      ?? (host?.includes("localhost") ? "http" : "https");
+    const origin = host
+      ? `${protocol}://${host}`
+      : process.env.NEXT_PUBLIC_SITE_URL ?? "https://trimos-food.vercel.app";
+    try {
+      await sendDriverInviteEmail({
+        email: normalizedEmail,
+        token,
+        restaurantName: restaurant.name,
+        expiresAt,
+        origin,
+      });
+    } catch (emailError) {
+      revalidatePath("/restaurant/drivers");
+      return {
+        ok: true,
+        emailSent: false,
+        message: `Convite criado, mas o e-mail não foi entregue: ${emailError instanceof Error ? emailError.message : "erro desconhecido"}. Envie o link manualmente.`,
+        token,
+      };
+    }
     revalidatePath("/restaurant/drivers");
-    return { ok: true, message: "Convite criado. Copie e envie o link ao estafeta.", token };
+    return {
+      ok: true,
+      emailSent: true,
+      message: "Convite enviado por e-mail. O link é individual e expira em sete dias.",
+      token,
+    };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Não foi possível criar o convite." };
   }

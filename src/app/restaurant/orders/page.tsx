@@ -12,6 +12,7 @@ export default async function OrdersPage() {
       id,
       customer_name,
       customer_phone,
+      table_label,
       type,
       status,
       subtotal,

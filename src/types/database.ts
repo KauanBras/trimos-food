@@ -817,8 +817,10 @@ export type Database = {
           ready_at: string | null
           refunded_at: string | null
           restaurant_id: string
+          restaurant_table_id: string | null
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
+          table_label: string | null
           total: number
           type: Database["public"]["Enums"]["order_type"]
           updated_at: string
@@ -853,8 +855,10 @@ export type Database = {
           ready_at?: string | null
           refunded_at?: string | null
           restaurant_id: string
+          restaurant_table_id?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
+          table_label?: string | null
           total?: number
           type: Database["public"]["Enums"]["order_type"]
           updated_at?: string
@@ -889,8 +893,10 @@ export type Database = {
           ready_at?: string | null
           refunded_at?: string | null
           restaurant_id?: string
+          restaurant_table_id?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
+          table_label?: string | null
           total?: number
           type?: Database["public"]["Enums"]["order_type"]
           updated_at?: string
@@ -908,6 +914,13 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_restaurant_table_id_fkey"
+            columns: ["restaurant_table_id"]
+            isOneToOne: false
+            referencedRelation: "restaurant_tables"
             referencedColumns: ["id"]
           },
         ]
@@ -1581,6 +1594,50 @@ export type Database = {
           },
         ]
       }
+      restaurant_tables: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          restaurant_id: string
+          seats: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          restaurant_id: string
+          seats?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          restaurant_id?: string
+          seats?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_tables_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       restaurant_users: {
         Row: {
           created_at: string
@@ -2013,6 +2070,13 @@ export type Database = {
       reset_demo_restaurant: {
         Args: { requested_restaurant_id: string }
         Returns: undefined
+      }
+      resolve_public_table: {
+        Args: {
+          requested_restaurant_slug: string
+          requested_table_code: string
+        }
+        Returns: Json
       }
       settle_driver_earnings: {
         Args: {

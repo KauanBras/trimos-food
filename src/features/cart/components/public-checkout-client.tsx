@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Banknote, CreditCard, LoaderCircle, LocateFixed, Minus, Plus, ShoppingBag, Smartphone, Trash2 } from "lucide-react";
+import { ArrowLeft, Banknote, CreditCard, LoaderCircle, LocateFixed, Minus, Plus, ShoppingBag, Smartphone, Trash2, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -22,6 +22,7 @@ type Props = {
     currencyCode: string;
     acceptsDelivery: boolean;
     acceptsPickup: boolean;
+    acceptsDineIn: boolean;
     isOpen: boolean;
     operatingLabel: string;
   };
@@ -38,6 +39,7 @@ type Props = {
     acceptsTerminal: boolean;
     acceptsMbWay: boolean;
   };
+  table: { name: string; code: string } | null;
 };
 
 type DeliveryLocation = { latitude: number; longitude: number };
@@ -53,11 +55,15 @@ function distanceInKilometers(origin: DeliveryLocation, destination: DeliveryLoc
   return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(value)));
 }
 
-export function PublicCheckoutClient({ restaurant, settings }: Props) {
+export function PublicCheckoutClient({ restaurant, settings, table }: Props) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [orderType, setOrderType] = useState<"delivery" | "pickup">(
-    restaurant.acceptsDelivery ? "delivery" : "pickup",
+  const [orderType, setOrderType] = useState<"delivery" | "pickup" | "dine_in">(
+    table && restaurant.acceptsDineIn
+      ? "dine_in"
+      : restaurant.acceptsDelivery
+        ? "delivery"
+        : "pickup",
   );
   const [submitting, setSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() =>
@@ -170,7 +176,9 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
           : "",
       requested_delivery_latitude: orderType === "delivery" ? deliveryLocation?.latitude ?? null : null,
       requested_delivery_longitude: orderType === "delivery" ? deliveryLocation?.longitude ?? null : null,
-      requested_notes: String(formData.get("orderNotes") ?? ""),
+      requested_notes: orderType === "dine_in" && table
+        ? `[[TRIMOS_TABLE:${table.code}]] ${String(formData.get("orderNotes") ?? "")}`.trim()
+        : String(formData.get("orderNotes") ?? ""),
       requested_items: items.map((item) => ({
         productId: item.productId,
         variantId: item.variant?.id ?? null,
@@ -242,7 +250,7 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
               Escolha produtos no menu para começar.
             </p>
             <Link
-              href={`/r/${restaurant.slug}`}
+              href={`/r/${restaurant.slug}${table ? `?table=${encodeURIComponent(table.code)}` : ""}`}
               className={buttonVariants({ className: "mt-6" })}
             >
               Voltar ao menu
@@ -256,7 +264,7 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
     <main className="min-h-screen bg-zinc-50 pb-10">
       <form onSubmit={submit} className="mx-auto max-w-5xl px-4 py-6">
         <Link
-          href={`/r/${restaurant.slug}`}
+          href={`/r/${restaurant.slug}${table ? `?table=${encodeURIComponent(table.code)}` : ""}`}
           className={buttonVariants({
             variant: "ghost",
             className: "mb-4 gap-2",
@@ -270,6 +278,12 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                 <p className="font-semibold">O restaurante está fechado.</p>
                 <p className="mt-1">{restaurant.operatingLabel}. Pode rever o carrinho, mas o pedido só pode ser enviado durante o horário de funcionamento.</p>
+              </div>
+            ) : null}
+            {table ? (
+              <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-amber-400 text-zinc-950"><UtensilsCrossed className="size-5" /></span>
+                <div><p className="font-semibold">Pedido para {table.name}</p><p className="text-sm">O restaurante receberá a identificação da mesa.</p></div>
               </div>
             ) : null}
             <h1 className="text-3xl font-semibold">O seu pedido</h1>
@@ -404,7 +418,7 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
                       onChange={() => setPaymentMethod("terminal")}
                     />
                     <CreditCard className="size-5 text-blue-600" />
-                    <span><span className="block font-medium">{orderType === "delivery" ? "Levar terminal" : "Terminal no levantamento"}</span><span className="text-xs text-zinc-500">Cartão ou MB WAY no momento da entrega</span></span>
+                    <span><span className="block font-medium">{orderType === "delivery" ? "Levar terminal" : orderType === "dine_in" ? "Terminal na mesa" : "Terminal no levantamento"}</span><span className="text-xs text-zinc-500">{orderType === "dine_in" ? "Pagar no restaurante" : "Cartão ou MB WAY no momento da entrega"}</span></span>
                   </label>
                 )}
                 {settings.acceptsCash && (
@@ -437,10 +451,15 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
             </Card>
             <Card className="shadow-none">
               <CardHeader>
-                <CardTitle>Como deseja receber?</CardTitle>
+                <CardTitle>{table ? "Local do pedido" : "Como deseja receber?"}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {restaurant.acceptsDelivery && (
+                {table ? (
+                  <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 font-medium text-amber-900">
+                    <UtensilsCrossed className="size-5" /> Consumo em {table.name}
+                  </div>
+                ) : null}
+                {!table && restaurant.acceptsDelivery && (
                   <label className="flex cursor-pointer items-center gap-3 rounded-xl border p-4">
                     <input
                       type="radio"
@@ -450,7 +469,7 @@ export function PublicCheckoutClient({ restaurant, settings }: Props) {
                     Entrega
                   </label>
                 )}
-                {restaurant.acceptsPickup && (
+                {!table && restaurant.acceptsPickup && (
                   <label className="flex cursor-pointer items-center gap-3 rounded-xl border p-4">
                     <input
                       type="radio"

@@ -29,6 +29,8 @@ type OrderStatus = Database["public"]["Enums"]["order_status"];
 type KitchenOrder = {
   id: string;
   customer_name: string;
+  type: Database["public"]["Enums"]["order_type"];
+  table_label: string | null;
   status: OrderStatus;
   estimated_minutes: number | null;
   accepted_at: string | null;
@@ -98,6 +100,8 @@ function KitchenClient({
       .select(`
         id,
         customer_name,
+        type,
+        table_label,
         status,
         estimated_minutes,
         accepted_at,
@@ -302,7 +306,7 @@ function KitchenClient({
                             #{order.id.slice(0, 6).toUpperCase()}
                           </CardTitle>
                           <p className="mt-1 text-sm text-zinc-500">
-                            {order.customer_name}
+                            {order.customer_name}{order.table_label ? ` · ${order.table_label}` : ""}
                           </p>
                         </div>
 
@@ -401,7 +405,7 @@ function KitchenClient({
                           #{order.id.slice(0, 6).toUpperCase()}
                         </p>
                         <p className="mt-1 text-sm text-zinc-600">
-                          {order.customer_name}
+                          {order.customer_name}{order.table_label ? ` · ${order.table_label}` : ""}
                         </p>
                       </div>
 

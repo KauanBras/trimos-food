@@ -36,6 +36,7 @@ type Props = {
   };
   variants: Variant[];
   groups: ModifierGroup[];
+  tableCode?: string;
 };
 
 export function PublicProductConfigurator({
@@ -43,6 +44,7 @@ export function PublicProductConfigurator({
   product,
   variants,
   groups,
+  tableCode,
 }: Props) {
   const [variantId, setVariantId] = useState(variants[0]?.id ?? "");
   const [selected, setSelected] = useState<
@@ -133,14 +135,14 @@ export function PublicProductConfigurator({
 
   return (
     <main className="min-h-screen bg-zinc-50 pb-32">
-      <PublicCartButton restaurantId={restaurant.id} slug={restaurant.slug} />
+      <PublicCartButton restaurantId={restaurant.id} slug={restaurant.slug} tableCode={tableCode} />
       <div className="mx-auto max-w-3xl px-4 py-6">
         <Link
           className={buttonVariants({
             variant: "ghost",
             className: "mb-4 gap-2",
           })}
-          href={`/r/${restaurant.slug}`}
+          href={`/r/${restaurant.slug}${tableCode ? `?table=${encodeURIComponent(tableCode)}` : ""}`}
         >
           <ArrowLeft className="size-4" /> Voltar ao menu
         </Link>

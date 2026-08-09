@@ -121,3 +121,16 @@ test("restaurante inexistente devolve página 404", async ({ page }) => {
     page.getByRole("heading", { name: "Página não encontrada" }),
   ).toBeVisible();
 });
+
+test("QR Code de mesa inválido é rejeitado sem abrir o menu", async ({
+  page,
+}) => {
+  const response = await page.goto(
+    `/r/${restaurantSlug}?table=CODIGOINVALIDO`,
+  );
+
+  expect(response?.status()).toBe(404);
+  await expect(
+    page.getByRole("heading", { name: "Página não encontrada" }),
+  ).toBeVisible();
+});

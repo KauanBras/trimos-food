@@ -82,6 +82,7 @@ export function RestaurantDriversClient({ initialDrivers, initialInvites, initia
   const [earnings, setEarnings] = useState(initialEarnings);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
+  const [lastInviteEmailSent, setLastInviteEmailSent] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function copyLink(link: string) {
@@ -100,6 +101,7 @@ export function RestaurantDriversClient({ initialDrivers, initialInvites, initia
       }
       const link = `${window.location.origin}/driver/invite/${result.token}`;
       setLastInviteLink(link);
+      setLastInviteEmailSent(Boolean(result.emailSent));
       toast.success(result.message);
     });
   }
@@ -152,9 +154,9 @@ export function RestaurantDriversClient({ initialDrivers, initialInvites, initia
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <section className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div><p className="text-sm font-medium text-amber-600">Rede de entregas</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Estafetas</h1><p className="mt-2 text-sm text-zinc-500">Frota privada, rede Trimos, disponibilidade e acertos no mesmo lugar.</p></div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setLastInviteLink(null); }}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setLastInviteLink(null); setLastInviteEmailSent(false); } }}>
           <DialogTrigger render={<Button className="h-11 gap-2 bg-zinc-950 hover:bg-zinc-800" />}><Plus className="size-4" /> Convidar estafeta</DialogTrigger>
-          <DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>Convidar estafeta</DialogTitle></DialogHeader>{lastInviteLink ? <div className="space-y-4"><div className="rounded-2xl bg-emerald-50 p-4 text-emerald-800"><p className="font-semibold">Convite pronto</p><p className="mt-1 text-sm">Envie este link. O convite expira em sete dias.</p></div><Input value={lastInviteLink} readOnly /><Button type="button" className="w-full" onClick={() => copyLink(lastInviteLink)}><Copy className="mr-2 size-4" /> Copiar link</Button></div> : <form onSubmit={invite} className="space-y-4"><div className="space-y-2"><Label htmlFor="driverEmail">E-mail do estafeta</Label><Input id="driverEmail" name="email" type="email" placeholder="estafeta@email.pt" required /></div><p className="text-sm text-zinc-500">O estafeta cria ou inicia sessão com este e-mail e ativa o perfil através do link.</p><Button type="submit" disabled={pending} className="w-full">{pending ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Send className="mr-2 size-4" />} Criar convite</Button></form>}</DialogContent>
+          <DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>Convidar estafeta</DialogTitle></DialogHeader>{lastInviteLink ? <div className="space-y-4"><div className={`rounded-2xl p-4 ${lastInviteEmailSent ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}><p className="font-semibold">{lastInviteEmailSent ? "Convite enviado por e-mail" : "Convite criado"}</p><p className="mt-1 text-sm">{lastInviteEmailSent ? "O estafeta recebeu o acesso individual. O link expira em sete dias e deixa de funcionar após a ativação." : "O e-mail não foi entregue. Copie e envie este link manualmente; ele expira em sete dias."}</p></div><Input value={lastInviteLink} readOnly /><Button type="button" variant={lastInviteEmailSent ? "outline" : "default"} className="w-full" onClick={() => copyLink(lastInviteLink)}><Copy className="mr-2 size-4" /> Copiar link de segurança</Button></div> : <form onSubmit={invite} className="space-y-4"><div className="space-y-2"><Label htmlFor="driverEmail">E-mail do estafeta</Label><Input id="driverEmail" name="email" type="email" placeholder="estafeta@email.pt" required /></div><p className="text-sm text-zinc-500">O sistema envia automaticamente um acesso individual. O convite expira em sete dias e só funciona para este e-mail.</p><Button type="submit" disabled={pending} className="w-full">{pending ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Send className="mr-2 size-4" />} Enviar convite</Button></form>}</DialogContent>
         </Dialog>
       </section>
 
