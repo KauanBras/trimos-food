@@ -24,6 +24,9 @@ type Props = {
     name: string;
     description: string | null;
     price: number;
+    regular_price: number | null;
+    promotion_enabled: boolean;
+    promotion_label: string | null;
     category_id: string | null;
     image_url: string | null;
     is_active: boolean;
@@ -40,6 +43,7 @@ const fieldClassName = "mt-2 w-full rounded-xl border px-4 py-3";
 export function ProductEditForm({ product, categories, initialModifierGroups, availableModifierGroups, initialVariants }: Props) {
   const [groups, setGroups] = useState(initialModifierGroups);
   const [variants, setVariants] = useState(initialVariants);
+  const [promotionEnabled, setPromotionEnabled] = useState(product.promotion_enabled);
   const [imagePreview, setImagePreview] = useState(product.image_url);
   const router = useRouter();
   const action = updateProductAction.bind(null, product.id);
@@ -113,10 +117,41 @@ export function ProductEditForm({ product, categories, initialModifierGroups, av
       </div>
 
       <div>
-        <label className="text-sm font-medium">Preço</label>
-        <input name="price" required type="number" min="0" step="0.01" defaultValue={product.price} className={fieldClassName} />
-        <p className="mt-2 text-xs text-zinc-500">Usado quando o produto não possui variações.</p>
+        <label className="text-sm font-medium">Preço normal</label>
+        <input name="regularPrice" required type="number" min="0" step="0.01" defaultValue={product.regular_price ?? product.price} className={fieldClassName} />
+        <p className="mt-2 text-xs text-zinc-500">Este é o preço de referência apresentado sem desconto.</p>
       </div>
+
+      <section className="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <label className="flex items-center justify-between gap-4">
+          <span>
+            <span className="block font-semibold">Promoção do produto</span>
+            <span className="block text-sm text-zinc-600">Apresenta o preço antigo riscado, o novo preço e o selo da oferta.</span>
+          </span>
+          <input
+            name="promotionEnabled"
+            type="checkbox"
+            checked={promotionEnabled}
+            disabled={variants.length > 0}
+            onChange={(event) => setPromotionEnabled(event.target.checked)}
+          />
+        </label>
+        {variants.length > 0 && (
+          <p className="text-sm text-amber-900">Para ativar uma promoção, remova primeiro as variações deste produto.</p>
+        )}
+        {promotionEnabled && variants.length === 0 && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="text-sm font-medium">Preço promocional (€)</label>
+              <input name="promotionPrice" required type="number" min="0" step="0.01" defaultValue={product.price} className={fieldClassName} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Selo da oferta</label>
+              <input name="promotionLabel" defaultValue={product.promotion_label ?? ""} placeholder="Ex.: -20% ou Oferta especial" className={fieldClassName} />
+            </div>
+          </div>
+        )}
+      </section>
 
       <section className="space-y-4 border-t pt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">

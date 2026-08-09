@@ -246,6 +246,39 @@ export async function updateRestaurantSettingsAction(
     }
 
     if (reservationsSectionPresent) {
+      const discountEnabled = formData.get("reservationDiscountEnabled") === "on";
+      const discountPercentText = textValue(formData, "reservationDiscountPercent");
+      const discountPercent = discountPercentText === "" ? null : Number(discountPercentText);
+      const discountStartsOn = optionalText(formData, "reservationDiscountStartsOn");
+      const discountEndsOn = optionalText(formData, "reservationDiscountEndsOn");
+      const discountStartTime = optionalText(formData, "reservationDiscountStartTime");
+      const discountEndTime = optionalText(formData, "reservationDiscountEndTime");
+      const submittedDiscountDays = Array.from(new Set(
+        formData.getAll("reservationDiscountDays").map(Number),
+      )).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6);
+
+      if (discountEnabled && (discountPercent === null || !Number.isFinite(discountPercent) || discountPercent < 1 || discountPercent > 90)) {
+        return { ok: false, message: "Indique um desconto de reserva entre 1% e 90%." };
+      }
+      if (discountEnabled && submittedDiscountDays.length === 0) {
+        return { ok: false, message: "Escolha pelo menos um dia para a oferta de reserva." };
+      }
+      if ((discountStartTime === null) !== (discountEndTime === null)) {
+        return { ok: false, message: "Preencha a hora inicial e final da oferta, ou deixe ambas vazias." };
+      }
+      if (discountStartTime && (!/^\d{2}:\d{2}$/.test(discountStartTime) || !/^\d{2}:\d{2}$/.test(discountEndTime ?? "") || discountStartTime === discountEndTime)) {
+        return { ok: false, message: "O período da oferta de reserva é inválido." };
+      }
+      if (discountStartsOn && !/^\d{4}-\d{2}-\d{2}$/.test(discountStartsOn)) {
+        return { ok: false, message: "A data inicial da oferta é inválida." };
+      }
+      if (discountEndsOn && !/^\d{4}-\d{2}-\d{2}$/.test(discountEndsOn)) {
+        return { ok: false, message: "A data final da oferta é inválida." };
+      }
+      if (discountStartsOn && discountEndsOn && discountStartsOn > discountEndsOn) {
+        return { ok: false, message: "A data final da oferta deve ser posterior à data inicial." };
+      }
+
       Object.assign(settingsUpdates, {
         reservation_slot_minutes: Math.min(
           120,
@@ -279,6 +312,18 @@ export async function updateRestaurantSettingsAction(
         ),
         auto_confirm_reservations:
           formData.get("autoConfirmReservations") === "on",
+        reservation_discount_enabled: discountEnabled,
+        reservation_discount_percent: discountPercent,
+        reservation_discount_description:
+          optionalText(formData, "reservationDiscountDescription"),
+        reservation_discount_starts_on: discountStartsOn,
+        reservation_discount_ends_on: discountEndsOn,
+        reservation_discount_days:
+          submittedDiscountDays.length > 0
+            ? submittedDiscountDays
+            : [0, 1, 2, 3, 4, 5, 6],
+        reservation_discount_start_time: discountStartTime,
+        reservation_discount_end_time: discountEndTime,
       });
     }
 

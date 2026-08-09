@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   CalendarCheck2,
+  BadgePercent,
   Check,
   Clock3,
   LoaderCircle,
@@ -47,6 +48,8 @@ export type ReservationRow = {
   source: Database["public"]["Enums"]["reservation_source"];
   special_requests: string | null;
   internal_notes: string | null;
+  discount_percent: number | null;
+  discount_label: string | null;
   created_at: string;
 };
 
@@ -88,7 +91,7 @@ export function ReservationsClient({
   const fetchReservations = useCallback(async () => {
     const { data, error } = await supabase
       .from("reservations")
-      .select("id, customer_name, customer_phone, customer_email, reservation_date, reservation_time, party_size, table_label, status, source, special_requests, internal_notes, created_at")
+      .select("id, customer_name, customer_phone, customer_email, reservation_date, reservation_time, party_size, table_label, status, source, special_requests, internal_notes, discount_percent, discount_label, created_at")
       .eq("restaurant_id", restaurantId)
       .order("reservation_date")
       .order("reservation_time");
@@ -185,6 +188,13 @@ export function ReservationsClient({
                 </div>
 
                 {reservation.special_requests && <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Pedido especial: {reservation.special_requests}</div>}
+
+                {reservation.discount_percent && (
+                  <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                    <BadgePercent className="mt-0.5 size-4 shrink-0" />
+                    <div><strong>Aplicar {reservation.discount_percent}% de desconto</strong><p className="mt-0.5">{reservation.discount_label || "Desconto na refeição"}</p></div>
+                  </div>
+                )}
 
                 <details className="rounded-xl border border-zinc-200 p-3">
                   <summary className="cursor-pointer text-sm font-medium">Mesa e notas internas</summary>

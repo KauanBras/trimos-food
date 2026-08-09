@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Clock3, LoaderCircle, Users } from "lucide-react";
+import { BadgePercent, CalendarDays, Clock3, LoaderCircle, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,17 @@ type BusinessHour = {
   opens_at: string | null;
   closes_at: string | null;
   is_closed: boolean;
+};
+
+type ReservationPromotion = {
+  enabled: boolean;
+  percent: number | null;
+  description: string | null;
+  startsOn: string | null;
+  endsOn: string | null;
+  days: number[];
+  startTime: string | null;
+  endTime: string | null;
 };
 
 const restaurantClock = new Intl.DateTimeFormat("en-CA", {
@@ -67,6 +78,7 @@ export function PublicReservationForm({
   advanceDays,
   businessHours,
   initialNow,
+  promotion,
 }: {
   restaurantId: string;
   slug: string;
@@ -74,6 +86,7 @@ export function PublicReservationForm({
   advanceDays: number;
   businessHours: BusinessHour[];
   initialNow: string;
+  promotion: ReservationPromotion;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -85,6 +98,23 @@ export function PublicReservationForm({
   const [date, setDate] = useState(today.date);
   const [time, setTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  function promotionApplies(selectedDate: string, selectedTime: string) {
+    if (!promotion.enabled || !promotion.percent || !selectedDate || !selectedTime) return false;
+    if (promotion.startsOn && selectedDate < promotion.startsOn) return false;
+    if (promotion.endsOn && selectedDate > promotion.endsOn) return false;
+    const dayOfWeek = new Date(`${selectedDate}T12:00:00`).getDay();
+    if (!promotion.days.includes(dayOfWeek)) return false;
+    if (!promotion.startTime || !promotion.endTime) return true;
+    const selectedMinutes = minutesFromTime(selectedTime);
+    const startMinutes = minutesFromTime(promotion.startTime);
+    const endMinutes = minutesFromTime(promotion.endTime);
+    return startMinutes < endMinutes
+      ? selectedMinutes >= startMinutes && selectedMinutes < endMinutes
+      : selectedMinutes >= startMinutes || selectedMinutes < endMinutes;
+  }
+
+  const selectedPromotionApplies = promotionApplies(date, time);
 
   const availableTimes = useMemo(() => {
     if (!date) return [];
@@ -156,6 +186,22 @@ export function PublicReservationForm({
     <Card className="border-zinc-200 bg-white shadow-xl shadow-zinc-200/60">
       <CardContent className="p-5 sm:p-7">
         <form onSubmit={submit} className="grid gap-5 sm:grid-cols-2">
+          {promotion.enabled && promotion.percent && (
+            <div className={`rounded-2xl border p-4 sm:col-span-2 ${selectedPromotionApplies ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-amber-700 shadow-sm"><BadgePercent className="size-5" /></div>
+                <div>
+                  <p className="font-semibold">{promotion.percent}% de desconto com reserva</p>
+                  <p className="mt-1 text-sm text-zinc-600">{promotion.description || "Desconto na refeição"}</p>
+                  <p className="mt-2 text-xs text-zinc-500">
+                    {selectedPromotionApplies
+                      ? "Esta data e horário têm a oferta. O desconto ficará registado na reserva."
+                      : "Escolha um dos horários identificados com desconto para aproveitar a oferta."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="customerName">Nome</Label>
             <Input
@@ -230,10 +276,11 @@ export function PublicReservationForm({
                     key={value}
                     type="button"
                     onClick={() => setTime(value)}
-                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${time === value ? "border-zinc-950 bg-zinc-950 text-white" : "border-zinc-200 hover:border-zinc-400"}`}
+                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${time === value ? "border-zinc-950 bg-zinc-950 text-white" : promotionApplies(date, value) ? "border-emerald-300 bg-emerald-50 hover:border-emerald-500" : "border-zinc-200 hover:border-zinc-400"}`}
                   >
                     <Clock3 className="mr-1 inline size-3.5" />
                     {value}
+                    {promotionApplies(date, value) && <span className="ml-1 text-[10px] font-bold">-{promotion.percent}%</span>}
                   </button>
                 ))}
               </div>
@@ -262,7 +309,7 @@ export function PublicReservationForm({
             ) : (
               <CalendarDays className="mr-2 size-4" />
             )}
-            {submitting ? "A reservar..." : "Pedir reserva"}
+            {submitting ? "A reservar..." : selectedPromotionApplies ? `Pedir reserva com ${promotion.percent}% de desconto` : "Pedir reserva"}
           </Button>
         </form>
       </CardContent>

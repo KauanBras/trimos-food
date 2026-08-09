@@ -14,6 +14,9 @@ export default async function ProductsPage() {
       name,
       description,
       price,
+      regular_price,
+      promotion_enabled,
+      promotion_label,
       image_url,
       is_active,
       is_available,
@@ -24,6 +27,7 @@ export default async function ProductsPage() {
       )
     `)
     .eq("restaurant_id", restaurantId)
+    .is("archived_at", null)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 

@@ -7,7 +7,7 @@ export default async function ReservationsPage() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("reservations")
-    .select("id, customer_name, customer_phone, customer_email, reservation_date, reservation_time, party_size, table_label, status, source, special_requests, internal_notes, created_at")
+    .select("id, customer_name, customer_phone, customer_email, reservation_date, reservation_time, party_size, table_label, status, source, special_requests, internal_notes, discount_percent, discount_label, created_at")
     .eq("restaurant_id", restaurantId)
     .order("reservation_date")
     .order("reservation_time");

@@ -111,6 +111,9 @@ export default async function PublicRestaurantPage({
         description,
         image_url,
         price,
+        regular_price,
+        promotion_enabled,
+        promotion_label,
         preparation_minutes,
         sort_order,
         product_variants (
@@ -392,6 +395,11 @@ export default async function PublicRestaurantPage({
                             <Card className="h-full overflow-hidden border-zinc-200 bg-white shadow-none transition hover:-translate-y-0.5 hover:shadow-md">
                               <div className="flex min-h-40">
                                 <CardContent className="flex flex-1 flex-col p-5">
+                                  {product.promotion_enabled && (
+                                    <span className="mb-2 w-fit rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                                      {product.promotion_label ?? "Promoção"}
+                                    </span>
+                                  )}
                                   <h3 className="text-lg font-semibold text-zinc-950">
                                     {product.name}
                                   </h3>
@@ -407,6 +415,11 @@ export default async function PublicRestaurantPage({
                                   <div className="mt-auto pt-5">
                                     <p className="text-lg font-semibold text-zinc-950">
                                       {product.product_variants.length > 0 && <span className="mr-1 text-xs font-normal text-zinc-500">A partir de</span>}
+                                      {product.promotion_enabled && product.regular_price && (
+                                        <span className="mr-2 text-sm font-normal text-zinc-400 line-through">
+                                          {formatMoney(product.regular_price, restaurant.currency_code)}
+                                        </span>
+                                      )}
                                       {formatMoney(
                                         product.product_variants.length > 0 ? Math.min(...product.product_variants.map((variant) => variant.price)) : product.price,
                                         restaurant.currency_code
@@ -479,12 +492,22 @@ export default async function PublicRestaurantPage({
                       >
                         <Card className="border-zinc-200 bg-white shadow-none">
                           <CardContent className="p-5">
+                            {product.promotion_enabled && (
+                              <span className="mb-2 inline-block rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                                {product.promotion_label ?? "Promoção"}
+                              </span>
+                            )}
                             <h3 className="font-semibold">
                               {product.name}
                             </h3>
 
                             <p className="mt-3 font-semibold">
                               {product.product_variants.length > 0 && <span className="mr-1 text-xs font-normal text-zinc-500">A partir de</span>}
+                              {product.promotion_enabled && product.regular_price && (
+                                <span className="mr-2 text-sm font-normal text-zinc-400 line-through">
+                                  {formatMoney(product.regular_price, restaurant.currency_code)}
+                                </span>
+                              )}
                               {formatMoney(
                                 product.product_variants.length > 0 ? Math.min(...product.product_variants.map((variant) => variant.price)) : product.price,
                                 restaurant.currency_code

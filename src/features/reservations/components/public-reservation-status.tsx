@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarCheck2, Clock3, LoaderCircle, Users, X } from "lucide-react";
+import { BadgePercent, CalendarCheck2, Clock3, LoaderCircle, Users, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,8 @@ export function PublicReservationStatus({
   time,
   partySize,
   tableLabel,
+  discountPercent,
+  discountLabel,
 }: {
   reservationId: string;
   token: string;
@@ -41,6 +43,8 @@ export function PublicReservationStatus({
   time: string;
   partySize: number;
   tableLabel: string | null;
+  discountPercent: number | null;
+  discountLabel: string | null;
 }) {
   const [status, setStatus] = useState(initialStatus);
   const [currentTableLabel, setCurrentTableLabel] = useState(tableLabel);
@@ -92,6 +96,15 @@ export function PublicReservationStatus({
         <div><p className="text-xs text-zinc-500">Hora</p><p className="mt-1 flex items-center gap-1.5 font-medium"><Clock3 className="size-4" />{time.slice(0, 5)}</p></div>
         <div><p className="text-xs text-zinc-500">Pessoas</p><p className="mt-1 flex items-center gap-1.5 font-medium"><Users className="size-4" />{partySize}</p></div>
       </div>
+      {discountPercent && (
+        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left">
+          <BadgePercent className="mt-0.5 size-5 shrink-0 text-emerald-700" />
+          <div>
+            <p className="font-semibold text-emerald-900">{discountPercent}% de desconto incluído</p>
+            <p className="mt-1 text-sm text-emerald-800">{discountLabel || "Desconto na refeição"}. Apresente esta reserva no restaurante.</p>
+          </div>
+        </div>
+      )}
       {currentTableLabel && <p className="mt-4 text-sm text-zinc-600">Mesa atribuída: <strong>{currentTableLabel}</strong></p>}
       <p className="mt-6 text-sm leading-6 text-zinc-500">Guarde este endereço para consultar o estado da reserva.</p>
       <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">

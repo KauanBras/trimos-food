@@ -33,6 +33,9 @@ type Props = {
     description: string | null;
     imageUrl: string | null;
     price: number;
+    regularPrice: number | null;
+    promotionEnabled: boolean;
+    promotionLabel: string | null;
   };
   variants: Variant[];
   groups: ModifierGroup[];
@@ -155,14 +158,26 @@ export function PublicProductConfigurator({
           )}
           <CardContent className="space-y-7 p-6">
             <div>
+              {product.promotionEnabled && (
+                <span className="mb-3 inline-block rounded-full bg-rose-100 px-3 py-1 text-sm font-semibold text-rose-700">
+                  {product.promotionLabel ?? "Promoção"}
+                </span>
+              )}
               <h1 className="text-3xl font-semibold">{product.name}</h1>
               {product.description && (
                 <p className="mt-2 leading-7 text-zinc-500">
                   {product.description}
                 </p>
               )}
-              <p className="mt-3 text-xl font-semibold">
-                {money.format(basePrice)}
+              <p className="mt-3 flex flex-wrap items-center gap-2 text-xl font-semibold">
+                {product.promotionEnabled && product.regularPrice && variants.length === 0 && (
+                  <span className="text-base font-normal text-zinc-400 line-through">
+                    {money.format(product.regularPrice)}
+                  </span>
+                )}
+                <span className={product.promotionEnabled ? "text-rose-700" : undefined}>
+                  {money.format(basePrice)}
+                </span>
               </p>
             </div>
             {variants.length > 0 && (

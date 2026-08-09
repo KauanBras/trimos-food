@@ -18,6 +18,7 @@ import {
   Store,
   WalletCards,
   Bike,
+  BadgePercent,
   Trash2,
   Upload,
   UtensilsCrossed,
@@ -70,6 +71,14 @@ type Settings = {
   reservation_advance_days: number;
   reservation_duration_minutes: number;
   auto_confirm_reservations: boolean;
+  reservation_discount_enabled: boolean;
+  reservation_discount_percent: number | null;
+  reservation_discount_description: string | null;
+  reservation_discount_starts_on: string | null;
+  reservation_discount_ends_on: string | null;
+  reservation_discount_days: number[];
+  reservation_discount_start_time: string | null;
+  reservation_discount_end_time: string | null;
   accepts_cash: boolean;
   accepts_terminal: boolean;
   accepts_mb_way: boolean;
@@ -141,6 +150,9 @@ export function RestaurantSettingsForm({
   const [removeCover, setRemoveCover] = useState(false);
   const [locatingRestaurant, setLocatingRestaurant] = useState(false);
   const [connectingStripe, setConnectingStripe] = useState(false);
+  const [reservationDiscountEnabled, setReservationDiscountEnabled] = useState(
+    settings.reservation_discount_enabled,
+  );
   const [deliveryOrigin, setDeliveryOrigin] = useState({
     latitude: settings.delivery_origin_latitude,
     longitude: settings.delivery_origin_longitude,
@@ -505,6 +517,7 @@ export function RestaurantSettingsForm({
               </div>
             </CardContent>
           </Card>
+
         </TabsContent>
 
         <TabsContent value="operation" keepMounted className="space-y-6">
@@ -578,6 +591,67 @@ export function RestaurantSettingsForm({
                 {locatingRestaurant ? <LoaderCircle className="size-4 animate-spin" /> : <LocateFixed className="size-4" />}
                 {locatingRestaurant ? "A obter localização..." : "Usar localização atual do restaurante"}
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reservations" keepMounted className="space-y-6">
+
+          <Card className="border-amber-200 bg-amber-50/60 shadow-none">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <BadgePercent className="size-5 text-amber-700" /> Oferta para reservas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <label className="flex items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-white p-4">
+                <div>
+                  <p className="font-medium">Ativar desconto para quem reserva</p>
+                  <p className="text-sm text-zinc-500">A oferta aparece no formulário e fica registada na reserva para ser aplicada na conta.</p>
+                </div>
+                <Switch name="reservationDiscountEnabled" checked={reservationDiscountEnabled} onCheckedChange={setReservationDiscountEnabled} />
+              </label>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="reservationDiscountPercent">Desconto (%)</Label>
+                  <Input id="reservationDiscountPercent" name="reservationDiscountPercent" type="number" min="1" max="90" step="0.01" required={reservationDiscountEnabled} defaultValue={settings.reservation_discount_percent ?? 20} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reservationDiscountDescription">Nome da oferta</Label>
+                  <Input id="reservationDiscountDescription" name="reservationDiscountDescription" defaultValue={settings.reservation_discount_description ?? "Desconto na refeição"} placeholder="Ex.: 20% no jantar" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reservationDiscountStartsOn">Data inicial (opcional)</Label>
+                  <Input id="reservationDiscountStartsOn" name="reservationDiscountStartsOn" type="date" defaultValue={settings.reservation_discount_starts_on ?? ""} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reservationDiscountEndsOn">Data final (opcional)</Label>
+                  <Input id="reservationDiscountEndsOn" name="reservationDiscountEndsOn" type="date" defaultValue={settings.reservation_discount_ends_on ?? ""} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reservationDiscountStartTime">A partir das (opcional)</Label>
+                  <Input id="reservationDiscountStartTime" name="reservationDiscountStartTime" type="time" defaultValue={timeValue(settings.reservation_discount_start_time)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reservationDiscountEndTime">Até às (opcional)</Label>
+                  <Input id="reservationDiscountEndTime" name="reservationDiscountEndTime" type="time" defaultValue={timeValue(settings.reservation_discount_end_time)} />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Dias em que a oferta é válida</Label>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  {dayNames.map((day, dayOfWeek) => (
+                    <label key={day} className="flex items-center gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm">
+                      <input type="checkbox" name="reservationDiscountDays" value={dayOfWeek} defaultChecked={settings.reservation_discount_days.includes(dayOfWeek)} />
+                      {day}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-xs leading-5 text-amber-900">Se não indicar datas, a oferta continua ativa. Se não indicar horas, vale durante todo o dia selecionado.</p>
             </CardContent>
           </Card>
         </TabsContent>

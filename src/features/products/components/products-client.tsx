@@ -30,6 +30,9 @@ type Product = {
   name: string;
   description: string | null;
   price: number;
+  regular_price: number | null;
+  promotion_enabled: boolean;
+  promotion_label: string | null;
   image_url: string | null;
   is_active: boolean;
   is_available: boolean;
@@ -169,9 +172,17 @@ export function ProductsClient({
                   {product.categories?.name ?? "Sem categoria"}
                 </p>
 
-                <p className="text-xl font-semibold">
-                  € {product.price.toFixed(2)}
-                </p>
+                {product.promotion_enabled && product.regular_price ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                      {product.promotion_label ?? "Promoção"}
+                    </span>
+                    <span className="text-sm text-zinc-400 line-through">€ {product.regular_price.toFixed(2)}</span>
+                    <span className="text-xl font-semibold text-rose-700">€ {product.price.toFixed(2)}</span>
+                  </div>
+                ) : (
+                  <p className="text-xl font-semibold">€ {product.price.toFixed(2)}</p>
+                )}
 
                 <div className="flex items-center justify-between rounded-xl bg-zinc-50 p-3 text-sm">
                   <span>{!product.is_active ? "Inativo" : product.is_available ? "Disponível" : "Indisponível"}</span>

@@ -142,7 +142,7 @@ function parseVariants(formData: FormData): ProductVariantInput[] {
 
 export async function updateProductAction(productId: string, formData: FormData) {
   const name = getRequiredField(formData, "name");
-  const price = Number(getRequiredField(formData, "price"));
+  const regularPrice = Number(getRequiredField(formData, "regularPrice"));
   const description = String(formData.get("description") ?? "").trim() || null;
   const categoryId = String(formData.get("categoryId") ?? "").trim() || null;
   const modifierGroups = parseModifierGroups(formData);
@@ -150,10 +150,29 @@ export async function updateProductAction(productId: string, formData: FormData)
   let imageUrl = String(formData.get("imageUrl") ?? "").trim() || null;
   const isActive = formData.get("isActive") === "on";
   const isAvailable = formData.get("isAvailable") === "on";
+  const promotionEnabled = formData.get("promotionEnabled") === "on";
+  const promotionPrice = Number(String(formData.get("promotionPrice") ?? ""));
+  const suppliedPromotionLabel = String(formData.get("promotionLabel") ?? "").trim();
 
-  if (!Number.isFinite(price) || price < 0) {
+  if (!Number.isFinite(regularPrice) || regularPrice < 0) {
     throw new Error("Introduza um preço válido.");
   }
+
+  if (promotionEnabled && variants.length > 0) {
+    throw new Error("As promoções ainda não podem ser combinadas com variações. Remova as variações ou desative a promoção.");
+  }
+
+  if (
+    promotionEnabled &&
+    (!Number.isFinite(promotionPrice) || promotionPrice < 0 || promotionPrice >= regularPrice)
+  ) {
+    throw new Error("O preço promocional deve ser menor do que o preço normal.");
+  }
+
+  const price = promotionEnabled ? promotionPrice : regularPrice;
+  const promotionLabel = promotionEnabled
+    ? suppliedPromotionLabel || `-${Math.round((1 - promotionPrice / regularPrice) * 100)}%`
+    : null;
 
   const { restaurantId } = await getCurrentRestaurant();
   const supabase = await createClient();
@@ -188,6 +207,9 @@ export async function updateProductAction(productId: string, formData: FormData)
 
   const { data: product, error: productError } = await supabase.from("products").update({
     name, description, price, category_id: categoryId, image_url: imageUrl,
+    regular_price: promotionEnabled ? regularPrice : null,
+    promotion_enabled: promotionEnabled,
+    promotion_label: promotionLabel,
     is_active: isActive, is_available: isAvailable,
   }).eq("id", productId).eq("restaurant_id", restaurantId).select("id").single();
   if (productError || !product) throw new Error(productError?.message ?? "Produto não encontrado.");
@@ -251,7 +273,7 @@ export async function updateProductOrderAction(productIds: string[]) {
 export async function duplicateProductAction(productId: string) {
   const { restaurantId } = await getCurrentRestaurant();
   const supabase = await createClient();
-  const { data: source, error } = await supabase.from("products").select("name, description, price, category_id, image_url, is_active, is_available, sort_order").eq("id", productId).eq("restaurant_id", restaurantId).single();
+  const { data: source, error } = await supabase.from("products").select("name, description, price, regular_price, promotion_enabled, promotion_label, category_id, image_url, is_active, is_available, sort_order").eq("id", productId).eq("restaurant_id", restaurantId).single();
   if (error) throw new Error(error.message);
   const { data: copy, error: copyError } = await supabase.from("products").insert({ ...source, restaurant_id: restaurantId, name: `${source.name} (cópia)`, sort_order: source.sort_order + 1 }).select("id").single();
   if (copyError) throw new Error(copyError.message);

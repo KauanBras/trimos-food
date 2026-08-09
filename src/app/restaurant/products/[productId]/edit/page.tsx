@@ -10,7 +10,7 @@ export default async function EditProductPage({ params }: PageProps<"/restaurant
   const supabase = await createClient();
 
   const [{ data: product }, { data: categories }, { data: modifierGroups, error: modifiersError }, { data: links }, { data: variants, error: variantsError }] = await Promise.all([
-    supabase.from("products").select("id, name, description, price, category_id, image_url, is_active, is_available").eq("id", productId).eq("restaurant_id", restaurantId).maybeSingle(),
+    supabase.from("products").select("id, name, description, price, regular_price, promotion_enabled, promotion_label, category_id, image_url, is_active, is_available").eq("id", productId).eq("restaurant_id", restaurantId).maybeSingle(),
     supabase.from("categories").select("id, name").eq("restaurant_id", restaurantId).eq("is_active", true).order("sort_order"),
     supabase.from("modifier_groups").select("id, name, min_selections, max_selections, is_active, modifier_options (name, price_delta, max_quantity, sort_order)").eq("restaurant_id", restaurantId).order("sort_order"),
     supabase.from("product_modifier_groups").select("modifier_group_id, sort_order").eq("product_id", productId).order("sort_order"),

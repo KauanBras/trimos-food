@@ -12,6 +12,8 @@ type ReservationPayload = {
   partySize: number;
   status: Database["public"]["Enums"]["reservation_status"];
   tableLabel: string | null;
+  discountPercent: number | null;
+  discountLabel: string | null;
 };
 
 export default async function ReservationStatusPage({
@@ -33,7 +35,7 @@ export default async function ReservationStatusPage({
 
   return (
     <main className="min-h-screen bg-zinc-50 px-4 py-10 sm:py-20">
-      <PublicReservationStatus reservationId={reservationId} token={query.token} slug={slug} initialStatus={reservation.status} customerName={reservation.customerName} date={reservation.date} time={reservation.time} partySize={reservation.partySize} tableLabel={reservation.tableLabel} />
+      <PublicReservationStatus reservationId={reservationId} token={query.token} slug={slug} initialStatus={reservation.status} customerName={reservation.customerName} date={reservation.date} time={reservation.time} partySize={reservation.partySize} tableLabel={reservation.tableLabel} discountPercent={reservation.discountPercent} discountLabel={reservation.discountLabel} />
     </main>
   );
 }

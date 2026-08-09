@@ -1052,6 +1052,7 @@ export type Database = {
       }
       products: {
         Row: {
+          archived_at: string | null
           category_id: string | null
           created_at: string
           description: string | null
@@ -1062,11 +1063,15 @@ export type Database = {
           name: string
           preparation_minutes: number | null
           price: number
+          promotion_enabled: boolean
+          promotion_label: string | null
+          regular_price: number | null
           restaurant_id: string
           sort_order: number
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -1077,11 +1082,15 @@ export type Database = {
           name: string
           preparation_minutes?: number | null
           price: number
+          promotion_enabled?: boolean
+          promotion_label?: string | null
+          regular_price?: number | null
           restaurant_id: string
           sort_order?: number
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -1092,6 +1101,9 @@ export type Database = {
           name?: string
           preparation_minutes?: number | null
           price?: number
+          promotion_enabled?: boolean
+          promotion_label?: string | null
+          regular_price?: number | null
           restaurant_id?: string
           sort_order?: number
           updated_at?: string
@@ -1221,6 +1233,8 @@ export type Database = {
           customer_id: string | null
           customer_name: string
           customer_phone: string
+          discount_label: string | null
+          discount_percent: number | null
           duration_minutes: number
           id: string
           internal_notes: string | null
@@ -1242,6 +1256,8 @@ export type Database = {
           customer_id?: string | null
           customer_name: string
           customer_phone: string
+          discount_label?: string | null
+          discount_percent?: number | null
           duration_minutes?: number
           id?: string
           internal_notes?: string | null
@@ -1263,6 +1279,8 @@ export type Database = {
           customer_id?: string | null
           customer_name?: string
           customer_phone?: string
+          discount_label?: string | null
+          discount_percent?: number | null
           duration_minutes?: number
           id?: string
           internal_notes?: string | null
@@ -1429,6 +1447,14 @@ export type Database = {
           primary_color: string
           reservation_advance_days: number
           reservation_capacity: number
+          reservation_discount_days: number[]
+          reservation_discount_description: string | null
+          reservation_discount_enabled: boolean
+          reservation_discount_end_time: string | null
+          reservation_discount_ends_on: string | null
+          reservation_discount_percent: number | null
+          reservation_discount_start_time: string | null
+          reservation_discount_starts_on: string | null
           reservation_duration_minutes: number
           reservation_slot_minutes: number
           restaurant_id: string
@@ -1463,6 +1489,14 @@ export type Database = {
           primary_color?: string
           reservation_advance_days?: number
           reservation_capacity?: number
+          reservation_discount_days?: number[]
+          reservation_discount_description?: string | null
+          reservation_discount_enabled?: boolean
+          reservation_discount_end_time?: string | null
+          reservation_discount_ends_on?: string | null
+          reservation_discount_percent?: number | null
+          reservation_discount_start_time?: string | null
+          reservation_discount_starts_on?: string | null
           reservation_duration_minutes?: number
           reservation_slot_minutes?: number
           restaurant_id: string
@@ -1497,6 +1531,14 @@ export type Database = {
           primary_color?: string
           reservation_advance_days?: number
           reservation_capacity?: number
+          reservation_discount_days?: number[]
+          reservation_discount_description?: string | null
+          reservation_discount_enabled?: boolean
+          reservation_discount_end_time?: string | null
+          reservation_discount_ends_on?: string | null
+          reservation_discount_percent?: number | null
+          reservation_discount_start_time?: string | null
+          reservation_discount_starts_on?: string | null
           reservation_duration_minutes?: number
           reservation_slot_minutes?: number
           restaurant_id?: string
@@ -1961,8 +2003,24 @@ export type Database = {
         Args: { requested_restaurant_id: string }
         Returns: {
           reservation_advance_days: number
+          reservation_discount_days: number[]
+          reservation_discount_description: string | null
+          reservation_discount_enabled: boolean
+          reservation_discount_end_time: string | null
+          reservation_discount_ends_on: string | null
+          reservation_discount_percent: number | null
+          reservation_discount_start_time: string | null
+          reservation_discount_starts_on: string | null
           reservation_slot_minutes: number
         }[]
+      }
+      reservation_discount_for_slot: {
+        Args: {
+          requested_date: string
+          requested_restaurant_id: string
+          requested_time: string
+        }
+        Returns: number
       }
       get_public_reservation_status: {
         Args: {
