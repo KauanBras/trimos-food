@@ -113,10 +113,10 @@ export default async function LoginPage({
         <p className="mt-6 text-center text-sm text-zinc-500">
           Ainda não tem conta?{" "}
           <Link
-            href={`/register${authContext}`}
+            href={isDriverInvite ? `/register${authContext}` : "/contact"}
             className="font-semibold text-zinc-950 hover:underline"
           >
-            Criar conta
+            {isDriverInvite ? "Criar conta" : "Pedir demonstração"}
           </Link>
         </p>
       </CardContent>

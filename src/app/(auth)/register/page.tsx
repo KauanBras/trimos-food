@@ -43,7 +43,7 @@ export default async function RegisterPage({
         <CardDescription>
           {isDriverInvite
             ? "Crie a sua conta para aceitar o convite de estafeta."
-            : "Crie o primeiro acesso do restaurante."}
+            : "Crie o acesso do restaurante depois de iniciar a ativação comercial."}
         </CardDescription>
       </CardHeader>
 
@@ -116,7 +116,7 @@ export default async function RegisterPage({
             type="submit"
             className="h-11 w-full bg-zinc-950 hover:bg-zinc-800"
           >
-            Criar conta
+            {isDriverInvite ? "Criar conta" : "Criar acesso comercial"}
           </Button>
         </form>
 

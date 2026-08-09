@@ -61,12 +61,13 @@ export async function syncPlatformSubscription(
     typeof subscription.customer === "string"
       ? subscription.customer
       : subscription.customer.id;
+  const normalizedStatus = normalizeStatus(subscription.status);
 
   const { error } = await admin
     .from("restaurant_subscriptions")
     .update({
       plan_id: planId,
-      status: normalizeStatus(subscription.status),
+      status: normalizedStatus,
       billing_interval: interval,
       billing_exempt: false,
       stripe_customer_id: customerId,
@@ -83,6 +84,15 @@ export async function syncPlatformSubscription(
     .eq("restaurant_id", restaurantId);
 
   if (error) throw new Error(error.message);
+
+  if (normalizedStatus === "active" || normalizedStatus === "trialing") {
+    const { error: restaurantError } = await admin
+      .from("restaurants")
+      .update({ status: "active" })
+      .eq("id", restaurantId)
+      .eq("status", "draft");
+    if (restaurantError) throw new Error(restaurantError.message);
+  }
 
   await admin.from("platform_audit_logs").insert({
     restaurant_id: restaurantId,
@@ -108,4 +118,27 @@ export async function syncPlatformCheckout(session: Stripe.Checkout.Session) {
     session.subscription,
   );
   await syncPlatformSubscription(subscription);
+
+  const setupFeeCents = Number(session.metadata?.setup_fee_cents ?? "0");
+  if (session.payment_status === "paid" && setupFeeCents > 0) {
+    const restaurantId = session.metadata?.restaurant_id;
+    if (!restaurantId) {
+      throw new Error("A sessão não identifica o restaurante da Trimos.");
+    }
+
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from("restaurant_subscriptions")
+      .update({ setup_fee_paid_at: new Date().toISOString() })
+      .eq("restaurant_id", restaurantId);
+    if (error) throw new Error(error.message);
+
+    await admin.from("platform_audit_logs").insert({
+      restaurant_id: restaurantId,
+      action: "subscription.setup_fee_paid",
+      entity_type: "stripe_checkout_session",
+      entity_id: session.id,
+      metadata: { setupFeeCents },
+    });
+  }
 }

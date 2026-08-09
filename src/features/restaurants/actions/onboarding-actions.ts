@@ -72,5 +72,5 @@ export async function createRestaurantAction(formData: FormData) {
     });
   }
 
-  redirect("/restaurant/getting-started");
+  redirect("/restaurant/billing");
 }

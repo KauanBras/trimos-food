@@ -1532,6 +1532,7 @@ export type Database = {
           last_payment_error: string | null
           plan_id: string
           restaurant_id: string
+          setup_fee_paid_at: string | null
           status: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -1551,6 +1552,7 @@ export type Database = {
           last_payment_error?: string | null
           plan_id: string
           restaurant_id: string
+          setup_fee_paid_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -1570,6 +1572,7 @@ export type Database = {
           last_payment_error?: string | null
           plan_id?: string
           restaurant_id?: string
+          setup_fee_paid_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -1791,6 +1794,7 @@ export type Database = {
           limits: Json
           monthly_price_cents: number
           name: string
+          setup_fee_cents: number
           sort_order: number
           stripe_monthly_price_id: string | null
           stripe_product_id: string | null
@@ -1810,6 +1814,7 @@ export type Database = {
           limits?: Json
           monthly_price_cents?: number
           name: string
+          setup_fee_cents?: number
           sort_order?: number
           stripe_monthly_price_id?: string | null
           stripe_product_id?: string | null
@@ -1829,6 +1834,7 @@ export type Database = {
           limits?: Json
           monthly_price_cents?: number
           name?: string
+          setup_fee_cents?: number
           sort_order?: number
           stripe_monthly_price_id?: string | null
           stripe_product_id?: string | null

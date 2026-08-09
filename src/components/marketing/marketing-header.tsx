@@ -36,11 +36,11 @@ export function MarketingHeader() {
             Entrar
           </Button>
           <Button
-            render={<Link href="/register" />}
+            render={<Link href="/contact" />}
             nativeButton={false}
             className="bg-amber-400 text-zinc-950 hover:bg-amber-300"
           >
-            Começar
+            Pedir demonstração
           </Button>
         </div>
       </div>

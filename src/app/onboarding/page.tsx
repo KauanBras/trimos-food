@@ -56,7 +56,7 @@ export default async function OnboardingPage({
           <div>
             <p className="font-semibold">Trimos Food</p>
             <p className="text-sm text-zinc-400">
-              Configuração inicial
+              Ativação comercial
             </p>
           </div>
         </div>
@@ -71,16 +71,15 @@ export default async function OnboardingPage({
           </h1>
 
           <p className="mt-6 max-w-lg leading-7 text-zinc-400">
-            Esta configuração cria o espaço exclusivo do restaurante,
-            com dados, equipa, pedidos e configurações completamente
-            separados dos restantes estabelecimentos.
+            Primeiro criamos o espaço exclusivo do restaurante. Em seguida,
+            confirma o plano e a configuração inicial antes da publicação.
           </p>
 
           <div className="mt-10 space-y-4">
             {[
               "Ambiente exclusivo e protegido",
-              "Pedidos e cozinha em tempo real",
-              "Preparado para reservas e estafetas",
+              "Sem período gratuito com trabalho manual",
+              "Publicação depois da ativação comercial",
             ].map((item) => (
               <div key={item} className="flex items-center gap-3">
                 <CheckCircle2 className="size-5 text-amber-400" />

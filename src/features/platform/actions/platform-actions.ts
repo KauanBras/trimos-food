@@ -162,6 +162,7 @@ export async function saveSubscriptionPlanAction(formData: FormData) {
   const description = optionalText(formData, "description");
   const monthlyPrice = eurosToCents(requiredText(formData, "monthlyPrice"));
   const yearlyPrice = eurosToCents(optionalText(formData, "yearlyPrice"));
+  const setupFee = eurosToCents(requiredText(formData, "setupFee"));
   const features = (optionalText(formData, "features") ?? "")
     .split("\n")
     .map((item) => item.trim())
@@ -170,8 +171,10 @@ export async function saveSubscriptionPlanAction(formData: FormData) {
   const isPublic = formData.get("isPublic") === "on";
   const sortOrder = Number(optionalText(formData, "sortOrder") ?? "0");
 
-  if (!code || monthlyPrice === null) {
-    throw new Error("Nome, código e preço mensal são obrigatórios.");
+  if (!code || monthlyPrice === null || setupFee === null) {
+    throw new Error(
+      "Nome, código, preço mensal e configuração inicial são obrigatórios.",
+    );
   }
 
   const { supabase } = await requireSuperAdmin();
@@ -181,6 +184,7 @@ export async function saveSubscriptionPlanAction(formData: FormData) {
     description,
     monthly_price_cents: monthlyPrice,
     yearly_price_cents: yearlyPrice,
+    setup_fee_cents: setupFee,
     features,
     is_active: isActive,
     is_public: isPublic,
@@ -208,7 +212,7 @@ export async function saveSubscriptionPlanAction(formData: FormData) {
     id ? "plan.updated" : "plan.created",
     "subscription_plan",
     result.data.id,
-    { code, monthlyPrice, yearlyPrice },
+    { code, monthlyPrice, yearlyPrice, setupFee },
   );
 
   revalidatePath("/admin/plans");

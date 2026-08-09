@@ -32,7 +32,10 @@ export async function POST(request: Request) {
     );
     const accountId = typeof event.account === "string" ? event.account : "";
 
-    if (event.type === "checkout.session.completed") {
+    if (
+      event.type === "checkout.session.completed" ||
+      event.type === "checkout.session.async_payment_succeeded"
+    ) {
       const session = event.data.object as Stripe.Checkout.Session;
       if (session.metadata?.purpose === "restaurant_subscription") {
         await syncPlatformCheckout(session);

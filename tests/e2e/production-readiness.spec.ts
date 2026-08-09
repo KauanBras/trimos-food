@@ -54,12 +54,20 @@ test("vitrine comercial apresenta produto, preços e contacto", async ({
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Começar", exact: true }),
+    page
+      .getByRole("banner")
+      .getByRole("button", { name: "Pedir demonstração", exact: true }),
   ).toBeVisible();
 
   await page.goto("/pricing");
   await expect(
     page.getByRole("heading", { name: "Um plano para cada fase." }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Demonstração gratuita, sem instalação"),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/de configuração inicial/).first(),
   ).toBeVisible();
 
   await page.goto("/contact");

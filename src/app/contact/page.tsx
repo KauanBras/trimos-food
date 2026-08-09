@@ -9,10 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { submitCommercialLeadAction } from "@/features/platform/actions/lead-actions";
 
 type ContactPageProps = {
-  searchParams: Promise<{ success?: string; error?: string }>;
+  searchParams: Promise<{ success?: string; error?: string; plan?: string }>;
 };
 export default async function ContactPage({ searchParams }: ContactPageProps) {
   const params = await searchParams;
+  const selectedPlan = params.plan?.trim().slice(0, 50) ?? "";
   return (
     <div className="min-h-screen bg-zinc-50">
       <MarketingHeader />
@@ -99,7 +100,16 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
                   </label>
                   <label className="block space-y-2">
                     <Label htmlFor="message">O que gostaria de melhorar?</Label>
-                    <Textarea id="message" name="message" rows={5} />
+                    <Textarea
+                      id="message"
+                      name="message"
+                      rows={5}
+                      defaultValue={
+                        selectedPlan
+                          ? `Tenho interesse no plano ${selectedPlan} e gostaria de conhecer a demonstração e a configuração inicial.`
+                          : undefined
+                      }
+                    />
                   </label>
                   <Button
                     type="submit"

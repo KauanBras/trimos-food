@@ -31,7 +31,7 @@ export default async function HomePage() {
   const { data: plans } = await supabase
     .from("subscription_plans")
     .select(
-      "id, name, description, monthly_price_cents, currency_code, features",
+      "id, code, name, description, monthly_price_cents, setup_fee_cents, currency_code, features",
     )
     .eq("is_active", true)
     .eq("is_public", true)
@@ -81,7 +81,7 @@ export default async function HomePage() {
             <div className="self-center">
               <Badge className="bg-amber-400 text-zinc-950">
                 <Sparkles className="size-3.5" />
-                30 dias para testar
+                Demonstração gratuita e pronta
               </Badge>
               <h1 className="mt-6 max-w-3xl text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
                 O restaurante inteiro, a funcionar num só lugar.
@@ -93,12 +93,12 @@ export default async function HomePage() {
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Button
-                  render={<Link href="/register" />}
+                  render={<Link href="/contact" />}
                   nativeButton={false}
                   size="lg"
                   className="h-11 gap-2 bg-amber-400 px-5 text-zinc-950 hover:bg-amber-300"
                 >
-                  Criar o meu restaurante <ArrowRight className="size-4" />
+                  Pedir demonstração <ArrowRight className="size-4" />
                 </Button>
                 <Button
                   render={<Link href="/r/hirotatsu-sushi" />}
@@ -111,7 +111,8 @@ export default async function HomePage() {
                 </Button>
               </div>
               <p className="mt-4 text-xs text-zinc-500">
-                Sem compromisso durante o período de teste. Configuração guiada.
+                Veja o sistema sem instalação. A configuração começa somente
+                depois da contratação.
               </p>
             </div>
             <div className="rounded-[2rem] border border-white/10 bg-white/5 p-4 shadow-2xl shadow-amber-950/30">
@@ -252,6 +253,13 @@ export default async function HomePage() {
                           /mês
                         </span>
                       </p>
+                      <p className="mt-2 text-sm font-medium text-amber-700">
+                        + {formatMoneyFromCents(
+                          plan.setup_fee_cents,
+                          plan.currency_code,
+                        )}{" "}
+                        de configuração inicial
+                      </p>
                       <ul className="mt-6 space-y-3">
                         {items.slice(0, 5).map((item) => (
                           <li
@@ -264,11 +272,15 @@ export default async function HomePage() {
                         ))}
                       </ul>
                       <Button
-                        render={<Link href="/register" />}
+                        render={
+                          <Link
+                            href={`/contact?plan=${encodeURIComponent(plan.code)}`}
+                          />
+                        }
                         nativeButton={false}
                         className="mt-7 w-full"
                       >
-                        Testar 30 dias
+                        Solicitar configuração
                       </Button>
                     </CardContent>
                   </Card>
@@ -284,24 +296,24 @@ export default async function HomePage() {
               Pronto para transformar a operação do seu restaurante?
             </h2>
             <p className="mt-4 max-w-2xl leading-7 text-amber-950/70">
-              Crie a conta agora ou fale connosco para uma demonstração
-              acompanhada.
+              Veja primeiro a demonstração. Só configuramos o restaurante
+              depois da aprovação comercial.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Button
-                render={<Link href="/register" />}
+                render={<Link href="/contact" />}
                 nativeButton={false}
                 className="bg-zinc-950 text-white hover:bg-zinc-800"
               >
-                Começar agora
+                Pedir demonstração
               </Button>
               <Button
-                render={<Link href="/contact" />}
+                render={<Link href="/pricing" />}
                 nativeButton={false}
                 variant="outline"
                 className="border-amber-900/20 bg-white/40"
               >
-                Pedir demonstração
+                Ver preços e configuração
               </Button>
             </div>
           </div>

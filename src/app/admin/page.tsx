@@ -23,7 +23,7 @@ import { formatDateTime } from "@/lib/platform/format";
 
 const subscriptionLabels: Record<string, string> = {
   incomplete: "Incompleta",
-  trialing: "Em teste",
+  trialing: "Promocional",
   active: "Ativa",
   past_due: "Pagamento pendente",
   paused: "Pausada",
@@ -90,7 +90,7 @@ export default async function AdminDashboardPage() {
     {
       label: "Assinaturas operacionais",
       value: activeSubscriptions,
-      detail: `${trials} em período de teste`,
+      detail: `${trials} em condição promocional`,
       icon: CreditCard,
     },
     {

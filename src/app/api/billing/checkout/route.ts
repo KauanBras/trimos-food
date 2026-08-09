@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type Stripe from "stripe";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -103,10 +104,31 @@ export async function POST(request: Request) {
     }
 
     const siteUrl = getSiteUrl();
+    const shouldChargeSetup =
+      !subscription.setup_fee_paid_at && plan.setup_fee_cents > 0;
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      { price: priceId, quantity: 1 },
+    ];
+
+    if (shouldChargeSetup) {
+      lineItems.push({
+        quantity: 1,
+        price_data: {
+          currency: plan.currency_code.toLowerCase(),
+          unit_amount: plan.setup_fee_cents,
+          product_data: {
+            name: `Configuração inicial — Trimos Food ${plan.name}`,
+            description:
+              "Ativação, identidade, configuração operacional e acompanhamento inicial.",
+          },
+        },
+      });
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: lineItems,
       allow_promotion_codes: true,
       billing_address_collection: "auto",
       tax_id_collection: { enabled: true },
@@ -116,6 +138,9 @@ export async function POST(request: Request) {
         restaurant_id: membership.restaurant_id,
         plan_id: plan.id,
         interval: body.interval!,
+        setup_fee_cents: shouldChargeSetup
+          ? String(plan.setup_fee_cents)
+          : "0",
       },
       subscription_data: {
         metadata: {

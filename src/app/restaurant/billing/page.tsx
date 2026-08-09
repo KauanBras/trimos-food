@@ -24,7 +24,7 @@ type BillingPageProps = {
 
 const statusLabels: Record<string, string> = {
   incomplete: "Configuração incompleta",
-  trialing: "Período de teste",
+  trialing: "Período promocional",
   active: "Assinatura ativa",
   past_due: "Pagamento pendente",
   paused: "Assinatura pausada",
@@ -136,7 +136,7 @@ export default async function RestaurantBillingPage({
             </h2>
             <p className="mt-2 text-sm text-zinc-400">
               {subscription.trial_ends_at && subscription.status === "trialing"
-                ? `Teste disponível até ${formatDateTime(subscription.trial_ends_at)}.`
+                ? `Condição promocional disponível até ${formatDateTime(subscription.trial_ends_at)}.`
                 : subscription.current_period_ends_at
                   ? `Período atual até ${formatDateTime(subscription.current_period_ends_at)}.`
                   : "Condição comercial administrada pela Trimos Food."}
@@ -161,7 +161,10 @@ export default async function RestaurantBillingPage({
                 (item): item is string => typeof item === "string",
               )
             : [];
-          const current = subscription.plan_id === plan.id;
+          const current =
+            subscription.plan_id === plan.id &&
+            Boolean(subscription.stripe_subscription_id) &&
+            ["active", "trialing", "past_due"].includes(subscription.status);
           return (
             <Card
               key={plan.id}
@@ -186,6 +189,16 @@ export default async function RestaurantBillingPage({
                 <p className="text-sm leading-6 text-zinc-500">
                   {plan.description}
                 </p>
+                {!subscription.setup_fee_paid_at &&
+                plan.setup_fee_cents > 0 ? (
+                  <p className="text-sm font-medium text-amber-700">
+                    + {formatMoneyFromCents(
+                      plan.setup_fee_cents,
+                      plan.currency_code,
+                    )}{" "}
+                    de configuração inicial, apenas uma vez
+                  </p>
+                ) : null}
               </CardHeader>
               <CardContent className="space-y-5">
                 <ul className="space-y-2">
@@ -230,6 +243,11 @@ export default async function RestaurantBillingPage({
           Stripe. A Trimos não guarda números de cartão.
         </p>
       </div>
+      <p className="text-center text-xs leading-5 text-zinc-400">
+        A mensalidade começa com a ativação. A garantia comercial de 14 dias
+        aplica-se à primeira mensalidade; a configuração inicial não é
+        reembolsável depois de iniciada.
+      </p>
     </div>
   );
 }

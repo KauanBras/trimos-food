@@ -63,7 +63,7 @@ export default async function AdminPlansPage() {
             <CardContent className="space-y-5 p-5">
               <form action={saveSubscriptionPlanAction} className="space-y-4">
                 <input type="hidden" name="id" value={plan.id} />
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <label className="space-y-1.5 text-sm">
                     <span className="font-medium">Nome</span>
                     <Input name="name" defaultValue={plan.name} required />
@@ -105,6 +105,17 @@ export default async function AdminPlansPage() {
                           ? (plan.yearly_price_cents / 100).toFixed(2)
                           : ""
                       }
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-sm">
+                    <span className="font-medium">Configuração (€)</span>
+                    <Input
+                      name="setupFee"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      defaultValue={(plan.setup_fee_cents / 100).toFixed(2)}
+                      required
                     />
                   </label>
                 </div>
@@ -178,7 +189,7 @@ export default async function AdminPlansPage() {
                 placeholder="Descrição comercial"
                 rows={3}
               />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <Input
                   name="monthlyPrice"
                   type="number"
@@ -193,6 +204,14 @@ export default async function AdminPlansPage() {
                   min="0"
                   step="0.01"
                   placeholder="Anual €"
+                />
+                <Input
+                  name="setupFee"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Configuração €"
+                  required
                 />
               </div>
               <Textarea
