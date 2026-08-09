@@ -1,12 +1,13 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bike,
   Check,
   Clock3,
   PackageCheck,
+  Printer,
   Search,
   ShoppingBag,
   Utensils,
@@ -32,6 +33,10 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { updateRestaurantOrderStatusAction } from "@/features/orders/actions/order-actions";
+import {
+  printThermalReceipt,
+  type ThermalReceiptRestaurant,
+} from "@/lib/printing/thermal-receipt";
 import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/database";
 import type { Json } from "@/types/database";
@@ -62,6 +67,9 @@ export type RestaurantOrder = {
   payment_method: Database["public"]["Enums"]["payment_method"];
   payment_status: Database["public"]["Enums"]["payment_status"];
   cash_tendered_amount: number | null;
+  delivery_address: string | null;
+  delivery_distance_km: number | null;
+  notes: string | null;
   estimated_minutes: number | null;
   created_at: string;
   order_items: OrderItem[];
@@ -71,6 +79,13 @@ type OrdersClientProps = {
   restaurantId: string;
   initialOrders: RestaurantOrder[];
   currencyCode: string;
+  receiptRestaurant: ThermalReceiptRestaurant;
+  printerSettings: {
+    enabled: boolean;
+    paperWidth: 58 | 80;
+    copies: number;
+    autoPrint: boolean;
+  };
 };
 
 const statusConfig: Record<
@@ -159,10 +174,13 @@ export function OrdersClient({
   restaurantId,
   initialOrders,
   currencyCode,
+  receiptRestaurant,
+  printerSettings,
 }: OrdersClientProps) {
   const supabase = useMemo(() => createClient(), []);
   const [orders, setOrders] = useState(initialOrders);
   const [search, setSearch] = useState("");
+  const knownOrderIds = useRef(new Set(initialOrders.map((order) => order.id)));
 
   async function fetchOrder(orderId: string) {
     const { data, error } = await supabase
@@ -180,6 +198,9 @@ export function OrdersClient({
         payment_method,
         payment_status,
         cash_tendered_amount,
+        delivery_address,
+        delivery_distance_km,
+        notes,
         estimated_minutes,
         created_at,
         order_items (
@@ -202,6 +223,40 @@ export function OrdersClient({
     return data as RestaurantOrder;
   }
 
+  function printOrder(order: RestaurantOrder, automatic = false) {
+    if (!printerSettings.enabled) return;
+
+    const storageKey = `trimos-auto-printed-${restaurantId}-${order.id}`;
+    if (automatic) {
+      try {
+        if (window.localStorage.getItem(storageKey)) return;
+      } catch {
+        // A impressão continua disponível quando o armazenamento do navegador está bloqueado.
+      }
+    }
+
+    const started = printThermalReceipt({
+      order,
+      restaurant: receiptRestaurant,
+      currencyCode,
+      paperWidth: printerSettings.paperWidth,
+      copies: printerSettings.copies,
+    });
+
+    if (!started) {
+      toast.error("Não foi possível abrir a impressão neste dispositivo.");
+      return;
+    }
+
+    if (automatic) {
+      try {
+        window.localStorage.setItem(storageKey, new Date().toISOString());
+      } catch {
+        // Alguns modos privados bloqueiam o armazenamento local.
+      }
+    }
+  }
+
   useEffect(() => {
     const channel = supabase
       .channel(`restaurant-orders-${restaurantId}`)
@@ -221,6 +276,7 @@ export function OrdersClient({
           }
 
           if (order.status === "pending_payment") return;
+          knownOrderIds.current.add(order.id);
 
           setOrders((current) => [
             order,
@@ -230,6 +286,10 @@ export function OrdersClient({
           toast.success("Novo pedido recebido", {
             description: `${order.customer_name} · ${formatMoney(order.total, currencyCode)}`,
           });
+
+          if (printerSettings.enabled && printerSettings.autoPrint) {
+            printOrder(order, true);
+          }
 
         }
       )
@@ -248,12 +308,24 @@ export function OrdersClient({
             return;
           }
 
+          const isNewToPanel = !knownOrderIds.current.has(order.id);
+          if (order.status !== "pending_payment") knownOrderIds.current.add(order.id);
+
           setOrders((current) => {
             if (order.status === "pending_payment") return current.filter((item) => item.id !== order.id);
             return current.some((item) => item.id === order.id)
               ? current.map((item) => (item.id === order.id ? order : item))
               : [order, ...current];
           });
+
+          if (
+            isNewToPanel &&
+            order.status !== "pending_payment" &&
+            printerSettings.enabled &&
+            printerSettings.autoPrint
+          ) {
+            printOrder(order, true);
+          }
         }
       )
       .subscribe();
@@ -267,6 +339,7 @@ export function OrdersClient({
     orderId: string,
     status: DatabaseOrderStatus
   ) {
+    const currentOrder = orders.find((order) => order.id === orderId);
     const result = await updateRestaurantOrderStatusAction(orderId, status);
     if (!result.ok) {
       toast.error("Não foi possível atualizar o pedido", {
@@ -280,6 +353,15 @@ export function OrdersClient({
         order.id === orderId ? { ...order, status, payment_status: result.paymentStatus ?? order.payment_status } : order
       )
     );
+
+    if (
+      status === "preparing" &&
+      currentOrder &&
+      printerSettings.enabled &&
+      printerSettings.autoPrint
+    ) {
+      printOrder(currentOrder, true);
+    }
   }
 
   const filteredOrders = orders.filter((order) => {
@@ -386,6 +468,17 @@ export function OrdersClient({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    {printerSettings.enabled && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => printOrder(order)}
+                      >
+                        <Printer className="mr-2 size-4" />
+                        Imprimir
+                      </Button>
+                    )}
+
                     {order.status === "new" && (
                       <>
                         <Button

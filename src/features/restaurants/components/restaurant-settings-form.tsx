@@ -13,6 +13,7 @@ import {
   MapPin,
   Palette,
   Plus,
+  Printer,
   Save,
   Settings2,
   Store,
@@ -34,6 +35,10 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { updateRestaurantSettingsAction } from "@/features/restaurants/actions/settings-actions";
+import {
+  createTestThermalReceipt,
+  printThermalReceipt,
+} from "@/lib/printing/thermal-receipt";
 
 type Restaurant = {
   name: string;
@@ -66,6 +71,10 @@ type Settings = {
   default_preparation_minutes: number;
   order_sound_enabled: boolean;
   auto_accept_orders: boolean;
+  receipt_printer_enabled: boolean;
+  receipt_paper_width: number;
+  receipt_print_copies: number;
+  auto_print_orders: boolean;
   reservation_slot_minutes: number;
   reservation_capacity: number;
   reservation_advance_days: number;
@@ -150,6 +159,9 @@ export function RestaurantSettingsForm({
   const [removeCover, setRemoveCover] = useState(false);
   const [locatingRestaurant, setLocatingRestaurant] = useState(false);
   const [connectingStripe, setConnectingStripe] = useState(false);
+  const [receiptPaperWidth, setReceiptPaperWidth] = useState<58 | 80>(
+    settings.receipt_paper_width === 58 ? 58 : 80,
+  );
   const [reservationDiscountEnabled, setReservationDiscountEnabled] = useState(
     settings.reservation_discount_enabled,
   );
@@ -300,6 +312,27 @@ export function RestaurantSettingsForm({
       },
       { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
     );
+  }
+
+  function testThermalPrinter() {
+    const started = printThermalReceipt({
+      order: createTestThermalReceipt(restaurant.name),
+      restaurant: {
+        name: restaurant.name,
+        addressLine: restaurant.address_line,
+        city: restaurant.city,
+        postalCode: restaurant.postal_code,
+        phone: restaurant.phone,
+      },
+      currencyCode: "EUR",
+      paperWidth: receiptPaperWidth,
+      copies: 1,
+      testMode: true,
+    });
+
+    if (!started) {
+      toast.error("Não foi possível abrir a impressão neste dispositivo.");
+    }
   }
 
   return (
@@ -566,6 +599,70 @@ export function RestaurantSettingsForm({
                 <span className="text-sm font-medium">Aceitação automática</span>
                 <Switch name="autoAcceptOrders" defaultChecked={settings.auto_accept_orders} />
               </label>
+            </CardContent>
+          </Card>
+
+          <Card className="border-zinc-200 shadow-none">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Printer className="size-5" /> Impressora térmica
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 p-4">
+                  <div>
+                    <p className="text-sm font-medium">Ativar comandas impressas</p>
+                    <p className="mt-1 text-xs text-zinc-500">Funciona com impressoras reconhecidas pelo computador ou tablet.</p>
+                  </div>
+                  <Switch name="receiptPrinterEnabled" defaultChecked={settings.receipt_printer_enabled} />
+                </label>
+
+                <label className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 p-4">
+                  <div>
+                    <p className="text-sm font-medium">Imprimir novos pedidos automaticamente</p>
+                    <p className="mt-1 text-xs text-zinc-500">Ative apenas no dispositivo ligado à impressora.</p>
+                  </div>
+                  <Switch name="autoPrintOrders" defaultChecked={settings.auto_print_orders} />
+                </label>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="receiptPaperWidth">Largura do papel</Label>
+                  <select
+                    id="receiptPaperWidth"
+                    name="receiptPaperWidth"
+                    value={receiptPaperWidth}
+                    onChange={(event) => setReceiptPaperWidth(event.target.value === "58" ? 58 : 80)}
+                    className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm"
+                  >
+                    <option value="58">58 mm</option>
+                    <option value="80">80 mm</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="receiptPrintCopies">Número de vias</Label>
+                  <Input
+                    id="receiptPrintCopies"
+                    name="receiptPrintCopies"
+                    type="number"
+                    min="1"
+                    max="3"
+                    step="1"
+                    defaultValue={settings.receipt_print_copies}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-zinc-50 p-4 text-sm leading-6 text-zinc-600">
+                A primeira impressão abre a janela do sistema. Escolha a impressora térmica e confirme o papel de 58 mm ou 80 mm. Para impressão totalmente silenciosa será necessário instalar posteriormente uma ponte local no equipamento do restaurante.
+              </div>
+
+              <Button type="button" variant="outline" className="gap-2" onClick={testThermalPrinter}>
+                <Printer className="size-4" /> Testar impressão
+              </Button>
             </CardContent>
           </Card>
 

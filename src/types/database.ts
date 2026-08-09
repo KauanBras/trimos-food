@@ -1445,6 +1445,10 @@ export type Database = {
           minimum_order_amount: number
           order_sound_enabled: boolean
           primary_color: string
+          receipt_paper_width: number
+          receipt_print_copies: number
+          receipt_printer_enabled: boolean
+          auto_print_orders: boolean
           reservation_advance_days: number
           reservation_capacity: number
           reservation_discount_days: number[]
@@ -1487,6 +1491,10 @@ export type Database = {
           minimum_order_amount?: number
           order_sound_enabled?: boolean
           primary_color?: string
+          receipt_paper_width?: number
+          receipt_print_copies?: number
+          receipt_printer_enabled?: boolean
+          auto_print_orders?: boolean
           reservation_advance_days?: number
           reservation_capacity?: number
           reservation_discount_days?: number[]
@@ -1529,6 +1537,10 @@ export type Database = {
           minimum_order_amount?: number
           order_sound_enabled?: boolean
           primary_color?: string
+          receipt_paper_width?: number
+          receipt_print_copies?: number
+          receipt_printer_enabled?: boolean
+          auto_print_orders?: boolean
           reservation_advance_days?: number
           reservation_capacity?: number
           reservation_discount_days?: number[]

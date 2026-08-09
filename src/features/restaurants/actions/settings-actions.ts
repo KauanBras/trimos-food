@@ -201,6 +201,8 @@ export async function updateRestaurantSettingsAction(
       const deliveryOriginLatitude = textValue(formData, "deliveryOriginLatitude");
       const deliveryOriginLongitude = textValue(formData, "deliveryOriginLongitude");
       const deliveryFeePerKm = Math.max(0, numberValue(formData, "deliveryFeePerKm", 0));
+      const submittedPaperWidth = Math.round(numberValue(formData, "receiptPaperWidth", 80));
+      const receiptPaperWidth = submittedPaperWidth === 58 ? 58 : 80;
       if ((deliveryOriginLatitude === "") !== (deliveryOriginLongitude === "")) {
         return { ok: false, message: "Defina novamente a localização de partida das entregas." };
       }
@@ -242,6 +244,13 @@ export async function updateRestaurantSettingsAction(
         ),
         order_sound_enabled: formData.get("orderSoundEnabled") === "on",
         auto_accept_orders: formData.get("autoAcceptOrders") === "on",
+        receipt_printer_enabled: formData.get("receiptPrinterEnabled") === "on",
+        receipt_paper_width: receiptPaperWidth,
+        receipt_print_copies: Math.min(
+          3,
+          Math.max(1, Math.round(numberValue(formData, "receiptPrintCopies", 1))),
+        ),
+        auto_print_orders: formData.get("autoPrintOrders") === "on",
       });
     }
 
