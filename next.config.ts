@@ -8,7 +8,15 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "**.supabase.co" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "**.supabase.co" },
+      {
+        protocol: "https",
+        hostname: "glovo.dhmedia.io",
+        port: "",
+        pathname: "/image/**",
+      },
+    ],
   },
   async headers() {
     return [
