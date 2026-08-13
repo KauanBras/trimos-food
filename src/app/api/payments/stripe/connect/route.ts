@@ -20,10 +20,16 @@ export async function POST() {
     }
 
     const [{ data: restaurant }, { data: settings }] = await Promise.all([
-      supabase.from("restaurants").select("name, email, slug").eq("id", membership.restaurant_id).single(),
+      supabase.from("restaurants").select("name, email, slug, is_demo, demo_locked").eq("id", membership.restaurant_id).single(),
       supabase.from("restaurant_settings").select("stripe_account_id").eq("restaurant_id", membership.restaurant_id).single(),
     ]);
     if (!restaurant || !settings) return NextResponse.json({ error: "Restaurante não encontrado." }, { status: 404 });
+    if (restaurant.is_demo && restaurant.demo_locked) {
+      return NextResponse.json(
+        { error: "A demonstração protegida não pode ligar pagamentos." },
+        { status: 409 },
+      );
+    }
 
     const stripe = getStripe();
     let accountId = settings.stripe_account_id;

@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { sendDriverInviteEmail } from "@/lib/email/driver-invite";
-import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
+import { getWritableCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
 
 export type DriverManagementResult = {
@@ -20,7 +20,8 @@ function canManage(role: string) {
 
 export async function createDriverInviteAction(email: string): Promise<DriverManagementResult> {
   try {
-    const { restaurantId, restaurant, role, user } = await getCurrentRestaurant();
+    const { restaurantId, restaurant, role, user } =
+      await getWritableCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para convidar estafetas." };
     const normalizedEmail = email.trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) return { ok: false, message: "Indique um e-mail válido." };
@@ -77,7 +78,7 @@ export async function createDriverInviteAction(email: string): Promise<DriverMan
 
 export async function cancelDriverInviteAction(inviteId: string): Promise<DriverManagementResult> {
   try {
-    const { restaurantId, role } = await getCurrentRestaurant();
+    const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para cancelar convites." };
     const supabase = await createClient();
     const { error } = await supabase.from("driver_invites").delete().eq("id", inviteId).eq("restaurant_id", restaurantId).is("accepted_at", null);
@@ -91,7 +92,7 @@ export async function cancelDriverInviteAction(inviteId: string): Promise<Driver
 
 export async function setDriverActiveAction(driverId: string, active: boolean): Promise<DriverManagementResult> {
   try {
-    const { restaurantId, role } = await getCurrentRestaurant();
+    const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para gerir estafetas." };
     const supabase = await createClient();
     const { data: membership } = await supabase.from("restaurant_drivers").select("id, drivers(status)").eq("driver_id", driverId).eq("restaurant_id", restaurantId).maybeSingle();
@@ -111,7 +112,7 @@ export async function settleDriverEarningsAction(
   reference: string,
 ): Promise<DriverManagementResult> {
   try {
-    const { restaurantId, role } = await getCurrentRestaurant();
+    const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para liquidar valores." };
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("settle_driver_earnings", {

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
+import { getWritableCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
 
 export type TableActionResult = { ok: boolean; message: string };
@@ -21,7 +21,7 @@ export async function createTablesAction(
   seats: number,
 ): Promise<TableActionResult> {
   try {
-    const { restaurantId, role } = await getCurrentRestaurant();
+    const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para gerir mesas." };
     const cleanPrefix = prefix.trim().slice(0, 40) || "Mesa";
     const safeQuantity = Math.min(100, Math.max(1, Math.floor(quantity)));
@@ -64,7 +64,7 @@ export async function setTableActiveAction(
   active: boolean,
 ): Promise<TableActionResult> {
   try {
-    const { restaurantId, role } = await getCurrentRestaurant();
+    const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para gerir mesas." };
     const supabase = await createClient();
     const { error } = await supabase.from("restaurant_tables").update({ is_active: active }).eq("id", tableId).eq("restaurant_id", restaurantId);
@@ -78,7 +78,7 @@ export async function setTableActiveAction(
 
 export async function regenerateTableCodeAction(tableId: string): Promise<TableActionResult> {
   try {
-    const { restaurantId, role } = await getCurrentRestaurant();
+    const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para gerir mesas." };
     const supabase = await createClient();
     const { error } = await supabase.from("restaurant_tables").update({ code: newTableCode(), is_active: true }).eq("id", tableId).eq("restaurant_id", restaurantId);
@@ -92,7 +92,7 @@ export async function regenerateTableCodeAction(tableId: string): Promise<TableA
 
 export async function deleteTableAction(tableId: string): Promise<TableActionResult> {
   try {
-    const { restaurantId, role } = await getCurrentRestaurant();
+    const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para gerir mesas." };
     const supabase = await createClient();
     const { error } = await supabase.from("restaurant_tables").delete().eq("id", tableId).eq("restaurant_id", restaurantId);

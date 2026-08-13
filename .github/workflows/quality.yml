@@ -4,12 +4,16 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17,47 * * * *"
 
 permissions:
   contents: read
 
 jobs:
   quality:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -63,3 +67,14 @@ jobs:
         run: npm run test:e2e
         env:
           E2E_BASE_URL: https://trimos-food.vercel.app
+
+  uptime:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verificar aplicação e base de dados
+        run: curl --fail --silent --show-error --max-time 20 --retry 2 https://trimos-food.vercel.app/api/health
+
+      - name: Verificar menu público
+        run: curl --fail --silent --show-error --max-time 20 --retry 2 https://trimos-food.vercel.app/r/hirotatsu-sushi > /dev/null

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
+import { getWritableCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 
 function getRequiredField(formData: FormData, field: string) {
   const value = formData.get(field);
@@ -28,7 +28,7 @@ export async function createProductAction(
   const categoryId =
     String(formData.get("categoryId") ?? "").trim() || null;
 
-  const { restaurantId } = await getCurrentRestaurant();
+  const { restaurantId } = await getWritableCurrentRestaurant();
   const supabase = await createClient();
 
   if (categoryId) {
@@ -174,7 +174,7 @@ export async function updateProductAction(productId: string, formData: FormData)
     ? suppliedPromotionLabel || `-${Math.round((1 - promotionPrice / regularPrice) * 100)}%`
     : null;
 
-  const { restaurantId } = await getCurrentRestaurant();
+  const { restaurantId } = await getWritableCurrentRestaurant();
   const supabase = await createClient();
 
   const { data: ownedProduct } = await supabase.from("products").select("id").eq("id", productId).eq("restaurant_id", restaurantId).maybeSingle();
@@ -251,7 +251,7 @@ export async function updateProductAction(productId: string, formData: FormData)
 }
 
 export async function setProductAvailabilityAction(productId: string, isAvailable: boolean) {
-  const { restaurantId } = await getCurrentRestaurant();
+  const { restaurantId } = await getWritableCurrentRestaurant();
   const supabase = await createClient();
   const { error } = await supabase.from("products").update({ is_available: isAvailable }).eq("id", productId).eq("restaurant_id", restaurantId);
   if (error) throw new Error(error.message);
@@ -259,7 +259,7 @@ export async function setProductAvailabilityAction(productId: string, isAvailabl
 }
 
 export async function updateProductOrderAction(productIds: string[]) {
-  const { restaurantId } = await getCurrentRestaurant();
+  const { restaurantId } = await getWritableCurrentRestaurant();
   const supabase = await createClient();
   const { error } = await supabase.rpc("reorder_restaurant_products", {
     requested_restaurant_id: restaurantId,
@@ -271,7 +271,7 @@ export async function updateProductOrderAction(productIds: string[]) {
 }
 
 export async function duplicateProductAction(productId: string) {
-  const { restaurantId } = await getCurrentRestaurant();
+  const { restaurantId } = await getWritableCurrentRestaurant();
   const supabase = await createClient();
   const { data: source, error } = await supabase.from("products").select("name, description, price, regular_price, promotion_enabled, promotion_label, category_id, image_url, is_active, is_available, sort_order").eq("id", productId).eq("restaurant_id", restaurantId).single();
   if (error) throw new Error(error.message);
@@ -306,7 +306,7 @@ export async function saveModifierGroupsAction(formData: FormData) {
   const parsed: unknown = JSON.parse(String(formData.get("groups") ?? "[]"));
   if (!Array.isArray(parsed)) throw new Error("Os grupos enviados são inválidos.");
   const groups = parsed as ManagedModifierGroup[];
-  const { restaurantId } = await getCurrentRestaurant();
+  const { restaurantId } = await getWritableCurrentRestaurant();
   const supabase = await createClient();
 
   for (const [groupOrder, rawGroup] of groups.entries()) {
@@ -376,7 +376,7 @@ export async function saveCategoriesAction(formData: FormData) {
     throw new Error("Cada categoria precisa de um nome único com pelo menos dois caracteres.");
   }
 
-  const { restaurantId } = await getCurrentRestaurant();
+  const { restaurantId } = await getWritableCurrentRestaurant();
   const supabase = await createClient();
 
   for (const [sortOrder, category] of categories.entries()) {

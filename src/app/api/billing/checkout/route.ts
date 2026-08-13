@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     const { data: membership } = await supabase
       .from("restaurant_users")
-      .select("restaurant_id, role, restaurants(name)")
+      .select("restaurant_id, role, restaurants(name, is_demo, demo_locked)")
       .eq("user_id", user.id)
       .eq("is_active", true)
       .maybeSingle();
@@ -37,6 +37,15 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Sem permissão para gerir a assinatura." },
         { status: 403 },
+      );
+    }
+    if (
+      membership.restaurants?.is_demo &&
+      membership.restaurants.demo_locked
+    ) {
+      return NextResponse.json(
+        { error: "A demonstração protegida não pode iniciar cobranças." },
+        { status: 409 },
       );
     }
 

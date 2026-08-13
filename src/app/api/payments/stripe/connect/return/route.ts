@@ -13,8 +13,11 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.redirect(new URL("/login", getSiteUrl()));
     const { data: membership } = await supabase.from("restaurant_users")
-      .select("restaurant_id").eq("user_id", user.id).eq("is_active", true).maybeSingle();
+      .select("restaurant_id, restaurants(is_demo, demo_locked)").eq("user_id", user.id).eq("is_active", true).maybeSingle();
     if (!membership) return NextResponse.redirect(new URL("/onboarding", getSiteUrl()));
+    if (membership.restaurants?.is_demo && membership.restaurants.demo_locked) {
+      throw new Error("A demonstração protegida não pode ligar pagamentos.");
+    }
     const { data: settings } = await supabase.from("restaurant_settings")
       .select("stripe_account_id").eq("restaurant_id", membership.restaurant_id).single();
     if (!settings?.stripe_account_id) throw new Error("Conta Stripe não encontrada.");

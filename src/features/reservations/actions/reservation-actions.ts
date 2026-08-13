@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
+import { getWritableCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
@@ -25,7 +25,7 @@ export async function createReservationAction(
   formData: FormData,
 ): Promise<ReservationActionResult> {
   try {
-    const { restaurantId, role, user } = await getCurrentRestaurant();
+    const { restaurantId, role, user } = await getWritableCurrentRestaurant();
     if (!canManage(role)) {
       return { ok: false, message: "Não tem permissão para criar reservas." };
     }
@@ -101,7 +101,7 @@ export async function updateReservationStatusAction(
   }
 
   try {
-    const { restaurantId, role } = await getCurrentRestaurant();
+    const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!canManage(role)) {
       return { ok: false, message: "Não tem permissão para alterar reservas." };
     }
@@ -135,7 +135,7 @@ export async function updateReservationDetailsAction(
   internalNotes: string,
 ): Promise<ReservationActionResult> {
   try {
-    const { restaurantId, role } = await getCurrentRestaurant();
+    const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!canManage(role)) {
       return { ok: false, message: "Não tem permissão para alterar reservas." };
     }

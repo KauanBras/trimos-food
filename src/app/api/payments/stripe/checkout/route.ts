@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSiteUrl, getStripe } from "@/lib/stripe/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/types/database";
 
 type CheckoutOrder = {
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as { orderId?: string; token?: string };
     if (!body.orderId || !body.token) return NextResponse.json({ error: "Pedido de pagamento inválido." }, { status: 400 });
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase.rpc("get_stripe_checkout_order", {
       requested_order_id: body.orderId,
       requested_order_token: body.token,

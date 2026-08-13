@@ -25,19 +25,24 @@ test("menu público abre sem imagens quebradas ou erros de hidratação", async 
     page.getByRole("link", { name: /Super Hiro 44 Peças/i }),
   ).toBeVisible();
 
-  const brokenImages = await page
-    .locator("img")
-    .evaluateAll((images) =>
-      images
-        .filter(
-          (image) =>
-            !(image as HTMLImageElement).complete ||
-            (image as HTMLImageElement).naturalWidth === 0,
-        )
-        .map((image) => (image as HTMLImageElement).alt),
-    );
+  const images = page.locator("img");
+  const imageCount = await images.count();
+  for (let index = 0; index < imageCount; index += 1) {
+    const image = images.nth(index);
+    await image.scrollIntoViewIfNeeded();
+    await expect
+      .poll(
+        () =>
+          image.evaluate(
+            (element) =>
+              (element as HTMLImageElement).complete &&
+              (element as HTMLImageElement).naturalWidth > 0,
+          ),
+        { message: `A imagem ${await image.getAttribute("alt")} não carregou.` },
+      )
+      .toBe(true);
+  }
 
-  expect(brokenImages).toEqual([]);
   expect(runtimeErrors).toEqual([]);
 });
 

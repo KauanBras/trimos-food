@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
+import { getWritableCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
 
 export type CustomerActionResult = { ok: boolean; message: string };
@@ -16,7 +16,7 @@ export async function updateCustomerAction(
   values: { name: string; email: string; phone: string; notes: string; tags: string[]; isBlocked: boolean },
 ): Promise<CustomerActionResult> {
   try {
-    const { restaurantId, role } = await getCurrentRestaurant();
+    const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para editar clientes." };
     if (values.name.trim().length < 2) return { ok: false, message: "Indique o nome do cliente." };
     if (!values.phone.trim() && !values.email.trim()) return { ok: false, message: "Indique um telefone ou e-mail." };

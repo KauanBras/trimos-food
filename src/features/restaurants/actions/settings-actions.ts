@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
+import { getWritableCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
@@ -131,7 +131,8 @@ export async function updateRestaurantSettingsAction(
   formData: FormData,
 ): Promise<SettingsActionResult> {
   try {
-    const { restaurantId, role, restaurant } = await getCurrentRestaurant();
+    const { restaurantId, role, restaurant } =
+      await getWritableCurrentRestaurant();
 
     if (!(["owner", "admin", "manager"] as string[]).includes(role)) {
       return {

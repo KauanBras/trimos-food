@@ -33,7 +33,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
+STRIPE_PLATFORM_WEBHOOK_SECRET=
+STRIPE_CONNECT_WEBHOOK_SECRET=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
@@ -60,7 +61,27 @@ A função `send-driver-push` necessita dos segredos `VAPID_SUBJECT`, `VAPID_PUB
 
 Cada restaurante liga a sua própria conta Stripe em **Configurações > Pagamentos**. O MB WAY só fica disponível depois de a Stripe confirmar a conta e a capacidade `mb_way_payments`.
 
-Na Stripe, configure um webhook para:
+Na Stripe, configure dois destinos de webhook independentes.
+
+Eventos da conta da plataforma (assinaturas Trimos):
+
+```text
+https://SEU-DOMINIO/api/billing/webhook
+```
+
+Escute:
+
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `customer.subscription.paused`
+- `customer.subscription.resumed`
+
+Guarde o respetivo segredo em `STRIPE_PLATFORM_WEBHOOK_SECRET`.
+
+Eventos das contas conectadas (pedidos dos restaurantes):
 
 ```text
 https://SEU-DOMINIO/api/payments/stripe/webhook
@@ -73,7 +94,7 @@ O webhook deve receber eventos das contas conectadas e escutar:
 - `checkout.session.async_payment_failed`
 - `checkout.session.expired`
 
-O `STRIPE_WEBHOOK_SECRET` deve ser o segredo desse endpoint. O `SUPABASE_SERVICE_ROLE_KEY` é usado apenas no servidor para confirmar os pagamentos; nunca deve ser exposto com prefixo `NEXT_PUBLIC_`.
+Guarde o respetivo segredo em `STRIPE_CONNECT_WEBHOOK_SECRET`. Durante a transição, `STRIPE_WEBHOOK_SECRET` continua aceite apenas em modo de teste. O `SUPABASE_SERVICE_ROLE_KEY` é usado apenas no servidor para confirmar os pagamentos; nunca deve ser exposto com prefixo `NEXT_PUBLIC_`.
 
 ## Qualidade
 

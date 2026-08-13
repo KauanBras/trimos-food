@@ -51,7 +51,10 @@ export function RestaurantTopbar(props: RestaurantTopbarProps) {
             <Menu className="size-5" />
           </SheetTrigger>
 
-          <SheetContent side="left" className="w-[290px] p-0">
+          <SheetContent
+            side="left"
+            className="h-dvh w-[290px] overflow-hidden p-0"
+          >
             <SheetHeader className="sr-only">
               <SheetTitle>Navegação</SheetTitle>
             </SheetHeader>

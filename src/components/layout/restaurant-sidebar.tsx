@@ -88,7 +88,9 @@ export function RestaurantSidebar({
     <aside
       className={cn(
         "min-h-screen w-[280px] shrink-0 border-r border-zinc-200 bg-white",
-        mobile ? "flex w-full flex-col" : "hidden lg:flex lg:flex-col",
+        mobile
+          ? "flex h-full min-h-0 w-full flex-col overflow-y-auto overscroll-contain"
+          : "hidden lg:flex lg:flex-col",
       )}
     >
       <div className="border-b border-zinc-200 p-4">

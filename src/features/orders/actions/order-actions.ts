@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
+import { getWritableCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { getStripe } from "@/lib/stripe/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
@@ -27,7 +27,7 @@ export async function updateRestaurantOrderStatusAction(
   status: OrderStatus,
 ): Promise<OrderActionResult> {
   try {
-    const { restaurantId, role } = await getCurrentRestaurant();
+    const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!["owner", "admin", "manager", "staff", "kitchen"].includes(role)) {
       return { ok: false, message: "Não tem permissão para atualizar pedidos." };
     }

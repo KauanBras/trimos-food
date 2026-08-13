@@ -9,12 +9,18 @@ import {
 
 import { Card, CardContent } from "@/components/ui/card";
 import { requireSuperAdmin } from "@/lib/platform/admin";
+import { hasDedicatedStripeWebhookSecret } from "@/lib/stripe/webhook-secrets";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminHealthPage() {
   const { supabase } = await requireSuperAdmin();
   const { error } = await supabase.from("restaurants").select("id").limit(1);
+  const stripeMode = process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_")
+    ? "real"
+    : process.env.STRIPE_SECRET_KEY
+      ? "teste"
+      : null;
   const checks = [
     {
       label: "Base de dados",
@@ -24,18 +30,26 @@ export default async function AdminHealthPage() {
     },
     {
       label: "Stripe",
-      detail: process.env.STRIPE_SECRET_KEY
-        ? "Chave configurada"
+      detail: stripeMode
+        ? `Chave configurada · modo ${stripeMode}`
         : "Falta configurar",
       healthy: Boolean(process.env.STRIPE_SECRET_KEY),
       icon: KeyRound,
     },
     {
-      label: "Webhook Stripe",
-      detail: process.env.STRIPE_WEBHOOK_SECRET
-        ? "Assinatura configurada"
-        : "Falta configurar",
-      healthy: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
+      label: "Webhook das assinaturas",
+      detail: hasDedicatedStripeWebhookSecret("platform")
+        ? "Destino dedicado configurado"
+        : "Pendente para o modo real",
+      healthy: hasDedicatedStripeWebhookSecret("platform"),
+      icon: Webhook,
+    },
+    {
+      label: "Webhook dos restaurantes",
+      detail: hasDedicatedStripeWebhookSecret("connect")
+        ? "Destino Connect configurado"
+        : "Pendente para o modo real",
+      healthy: hasDedicatedStripeWebhookSecret("connect"),
       icon: Webhook,
     },
     {

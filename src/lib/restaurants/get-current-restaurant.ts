@@ -36,7 +36,9 @@ export async function getCurrentRestaurant() {
         accepts_delivery,
         accepts_pickup,
         accepts_dine_in,
-        accepts_reservations
+        accepts_reservations,
+        is_demo,
+        demo_locked
       )
     `)
     .eq("user_id", user.id)
@@ -59,4 +61,16 @@ export async function getCurrentRestaurant() {
     restaurantId: membership.restaurant_id,
     restaurant: membership.restaurants,
   };
+}
+
+export async function getWritableCurrentRestaurant() {
+  const context = await getCurrentRestaurant();
+
+  if (context.restaurant.is_demo && context.restaurant.demo_locked) {
+    throw new Error(
+      "Esta demonstração está protegida. A administração Trimos pode repor ou desbloquear os dados.",
+    );
+  }
+
+  return context;
 }
