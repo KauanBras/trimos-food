@@ -21,6 +21,7 @@ export default async function DriverHistoryPage() {
       status,
       created_at,
       settled_at,
+      settlement_reference,
       orders (
         customer_name,
         total
@@ -96,6 +97,7 @@ export default async function DriverHistoryPage() {
                   </p>
                   {Number(earning.cash_collected) > 0 ? <p>Dinheiro recebido do cliente: {new Intl.NumberFormat("pt-PT", { style: "currency", currency: currencyCode }).format(earning.cash_collected)}</p> : null}
                   <p className={earning.status === "settled" ? "text-emerald-700" : "text-amber-700"}>{earning.status === "settled" ? "Acerto liquidado" : Number(earning.net_balance) >= 0 ? `Restaurante deve: ${new Intl.NumberFormat("pt-PT", { style: "currency", currency: currencyCode }).format(earning.net_balance)}` : `A entregar ao restaurante: ${new Intl.NumberFormat("pt-PT", { style: "currency", currency: currencyCode }).format(Math.abs(earning.net_balance))}`}</p>
+                  {earning.status === "settled" && earning.settlement_reference ? <p className="text-xs text-zinc-500">Referência: {earning.settlement_reference}</p> : null}
                 </CardContent>
               </Card>
             );

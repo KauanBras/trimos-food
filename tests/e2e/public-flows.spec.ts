@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const restaurantSlug = process.env.E2E_RESTAURANT_SLUG ?? "hirotatsu-sushi";
+const reservationRestaurantSlug =
+  process.env.E2E_RESERVATION_RESTAURANT_SLUG ?? "hirotatsu-sushi-demo";
 
 function captureRuntimeErrors(page: Page) {
   const errors: string[] = [];
@@ -95,7 +97,7 @@ test("reserva pública é determinística e não gera erro de hidratação", asy
 }) => {
   const runtimeErrors = captureRuntimeErrors(page);
 
-  await page.goto(`/r/${restaurantSlug}/reservar`);
+  await page.goto(`/r/${reservationRestaurantSlug}/reservar`);
 
   await expect(
     page.getByRole("heading", { name: /Reservar no/i }),

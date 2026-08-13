@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Banknote, Bike, Copy, LoaderCircle, Mail, MapPin, Phone, Plus, Power, Send, Truck, UserRound, WalletCards, X } from "lucide-react";
+import { AlertCircle, Banknote, Bike, CheckCircle2, Copy, Landmark, LoaderCircle, Mail, MapPin, Phone, Plus, Power, ReceiptText, Send, Truck, UserRound, WalletCards, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,7 @@ type EarningRow = {
   status: Database["public"]["Enums"]["driver_earning_status"];
   created_at: string;
   settled_at: string | null;
+  settlement_reference: string | null;
   drivers: {
     id: string;
     payout_method: Database["public"]["Enums"]["driver_payout_method"];
@@ -60,6 +61,19 @@ type InviteRow = {
   token: string;
   expires_at: string;
   accepted_at: string | null;
+};
+
+type SettlementGroup = {
+  driverId: string;
+  driverName: string;
+  payoutMethod: Database["public"]["Enums"]["driver_payout_method"];
+  payoutPhone: string | null;
+  payoutIban: string | null;
+  earningIds: string[];
+  deliveryCount: number;
+  driverFees: number;
+  cashCollected: number;
+  netBalance: number;
 };
 
 const statusLabels: Record<DriverStatus, string> = {
@@ -83,6 +97,8 @@ export function RestaurantDriversClient({ initialDrivers, initialInvites, initia
   const [dialogOpen, setDialogOpen] = useState(false);
   const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
   const [lastInviteEmailSent, setLastInviteEmailSent] = useState(false);
+  const [settlementGroup, setSettlementGroup] = useState<SettlementGroup | null>(null);
+  const [settlementReference, setSettlementReference] = useState("");
   const [pending, startTransition] = useTransition();
 
   function copyLink(link: string) {
@@ -128,13 +144,18 @@ export function RestaurantDriversClient({ initialDrivers, initialInvites, initia
     });
   }
 
-  function settleEarning(earning: EarningRow) {
+  function settleGroup() {
+    if (!settlementGroup) return;
     startTransition(async () => {
-      const result = await settleDriverEarningsAction([earning.id], `Liquidação ${new Date().toLocaleDateString("pt-PT")}`);
+      const result = await settleDriverEarningsAction(settlementGroup.earningIds, settlementReference);
       if (!result.ok) toast.error(result.message);
       else {
         toast.success(result.message);
-        setEarnings((current) => current.map((item) => item.id === earning.id ? { ...item, status: "settled", settled_at: new Date().toISOString() } : item));
+        const settledAt = new Date().toISOString();
+        const settledIds = new Set(settlementGroup.earningIds);
+        setEarnings((current) => current.map((item) => settledIds.has(item.id) ? { ...item, status: "settled", settled_at: settledAt, settlement_reference: settlementReference.trim() } : item));
+        setSettlementGroup(null);
+        setSettlementReference("");
       }
     });
   }
@@ -149,6 +170,50 @@ export function RestaurantDriversClient({ initialDrivers, initialInvites, initia
       !invite.accepted_at
       && new Date(invite.expires_at).getTime() > new Date(initialNow).getTime(),
   );
+  const pendingSettlementGroups = Object.values(
+    earnings
+      .filter((earning) => earning.status === "pending" && earning.drivers)
+      .reduce<Record<string, SettlementGroup>>((groups, earning) => {
+        const driver = earning.drivers!;
+        const current = groups[driver.id] ?? {
+          driverId: driver.id,
+          driverName: driver.profiles?.full_name ?? "Estafeta",
+          payoutMethod: driver.payout_method,
+          payoutPhone: driver.payout_phone,
+          payoutIban: driver.payout_iban,
+          earningIds: [],
+          deliveryCount: 0,
+          driverFees: 0,
+          cashCollected: 0,
+          netBalance: 0,
+        };
+        current.earningIds.push(earning.id);
+        current.deliveryCount += 1;
+        current.driverFees += Number(earning.driver_fee);
+        current.cashCollected += Number(earning.cash_collected);
+        current.netBalance += Number(earning.net_balance);
+        groups[driver.id] = current;
+        return groups;
+      }, {}),
+  );
+
+  function payoutMethodLabel(method: SettlementGroup["payoutMethod"]) {
+    if (method === "mb_way") return "MB WAY";
+    if (method === "bank_transfer") return "Transferência bancária";
+    return "Dinheiro";
+  }
+
+  function payoutDestination(group: SettlementGroup) {
+    if (group.payoutMethod === "mb_way") return group.payoutPhone;
+    if (group.payoutMethod === "bank_transfer") return group.payoutIban;
+    return null;
+  }
+
+  function openSettlement(group: SettlementGroup) {
+    const direction = group.netBalance >= 0 ? "Pagamento" : "Recebimento";
+    setSettlementReference(`${direction} ${payoutMethodLabel(group.payoutMethod)} · ${new Date().toLocaleDateString("pt-PT")}`);
+    setSettlementGroup(group);
+  }
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -171,15 +236,28 @@ export function RestaurantDriversClient({ initialDrivers, initialInvites, initia
       {!drivers.length ? <div className="flex min-h-72 flex-col items-center justify-center rounded-3xl border border-dashed border-zinc-300 bg-white text-center"><Bike className="size-9 text-zinc-300" /><p className="mt-4 font-medium">Ainda não existem estafetas próprios</p><p className="mt-1 max-w-sm text-sm text-zinc-500">Pode convidar a sua frota ou ativar a rede Trimos nas configurações.</p></div> : <div className="grid gap-4 xl:grid-cols-2">{drivers.map((driver) => { const name = driver.profiles?.full_name || "Estafeta"; const phone = driver.phone || driver.profiles?.phone; const completedCount = driver.deliveries.filter((delivery) => delivery.status === "delivered").length; return <Card key={driver.id} className="border-zinc-200 shadow-none"><CardHeader><div className="flex items-start gap-4"><div className="flex size-12 items-center justify-center rounded-2xl bg-zinc-950 text-white"><UserRound className="size-5" /></div><div className="min-w-0 flex-1"><CardTitle className="truncate text-lg">{name}</CardTitle><div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant="outline" className={statusClasses[driver.status]}>{statusLabels[driver.status]}</Badge>{driver.is_network_enabled && <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-700">Rede Trimos</Badge>}{!driver.is_active && <Badge variant="outline">Acesso suspenso</Badge>}</div></div><Button variant="outline" size="sm" disabled={pending || driver.status === "busy"} onClick={() => toggleDriver(driver)}><Power className="mr-1 size-4" />{driver.is_active ? "Suspender" : "Reativar"}</Button></div></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-2 gap-3 rounded-2xl bg-zinc-50 p-4"><div><p className="text-xs text-zinc-500">Veículo</p><p className="mt-1 flex items-center gap-1.5 font-medium"><Truck className="size-4" />{driver.vehicle_type ?? "Não indicado"}</p></div><div><p className="text-xs text-zinc-500">Concluídas</p><p className="mt-1 font-medium">{completedCount}</p></div></div>{phone && <a href={`tel:${phone}`} className="flex items-center gap-2 text-sm text-zinc-600"><Phone className="size-4" />{phone}</a>}{driver.location_updated_at && <p className="flex items-center gap-2 text-xs text-zinc-400"><MapPin className="size-3.5" /> Localização atualizada às {new Intl.DateTimeFormat("pt-PT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon" }).format(new Date(driver.location_updated_at))}</p>}</CardContent></Card>; })}</div>}
 
       <Card className="border-zinc-200 shadow-none">
-        <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><WalletCards className="size-5" /> Acertos dos estafetas</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><WalletCards className="size-5" /> Pagamentos dos estafetas</CardTitle></CardHeader>
         <CardContent className="space-y-4">
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            <p className="font-semibold">Como funciona o recebimento</p>
+            <p className="mt-1 leading-6 text-blue-800">O Trimos calcula cada entrega. Nos pedidos pagos online, o restaurante paga o ganho do estafeta pelo método indicado. Nos pedidos em dinheiro, o estafeta conserva o seu ganho e entrega ao restaurante apenas o restante. A confirmação abaixo guarda o comprovativo no histórico dos dois.</p>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl bg-emerald-50 p-4"><p className="text-sm text-emerald-700">Restaurante deve aos estafetas</p><p className="mt-2 text-2xl font-semibold text-emerald-800">{money(earnings.filter((item) => item.status === "pending").reduce((sum, item) => sum + Math.max(0, Number(item.net_balance)), 0))}</p></div>
             <div className="rounded-2xl bg-amber-50 p-4"><p className="text-sm text-amber-700">Dinheiro a receber dos estafetas</p><p className="mt-2 text-2xl font-semibold text-amber-800">{money(earnings.filter((item) => item.status === "pending").reduce((sum, item) => sum + Math.max(0, -Number(item.net_balance)), 0))}</p></div>
           </div>
-          {!earnings.length ? <p className="rounded-2xl border border-dashed p-8 text-center text-sm text-zinc-500">Os acertos aparecerão depois das primeiras entregas concluídas.</p> : earnings.map((earning) => <div key={earning.id} className="flex flex-col justify-between gap-3 rounded-2xl border border-zinc-200 p-4 sm:flex-row sm:items-center"><div><p className="font-medium">{earning.drivers?.profiles?.full_name ?? "Estafeta"} · {earning.orders?.customer_name ?? "Pedido"}</p><p className="mt-1 text-sm text-zinc-500">Ganho {money(earning.driver_fee)}{Number(earning.cash_collected) > 0 ? ` · recebeu ${money(earning.cash_collected)} em dinheiro` : ""}</p><p className={`mt-1 text-sm font-medium ${Number(earning.net_balance) >= 0 ? "text-emerald-700" : "text-amber-700"}`}>{Number(earning.net_balance) >= 0 ? `Pagar ao estafeta ${money(earning.net_balance)}` : `Receber do estafeta ${money(Math.abs(earning.net_balance))}`}</p>{earning.status === "pending" && earning.drivers ? <p className="mt-1 text-xs text-zinc-500">{earning.drivers.payout_method === "mb_way" ? `MB WAY: ${earning.drivers.payout_phone ?? "não indicado"}` : earning.drivers.payout_method === "bank_transfer" ? `IBAN: ${earning.drivers.payout_iban ?? "não indicado"}` : "Acerto em dinheiro"}</p> : null}</div><div>{earning.status === "settled" ? <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Liquidado</Badge> : <Button type="button" size="sm" disabled={pending} onClick={() => settleEarning(earning)}>{Number(earning.net_balance) >= 0 ? <WalletCards className="mr-2 size-4" /> : <Banknote className="mr-2 size-4" />} Marcar liquidado</Button>}</div></div>)}
+          {!earnings.length ? <p className="rounded-2xl border border-dashed p-8 text-center text-sm text-zinc-500">Os acertos aparecerão depois das primeiras entregas concluídas.</p> : pendingSettlementGroups.length ? <div className="space-y-3"><p className="text-sm font-semibold text-zinc-900">Acertos pendentes</p>{pendingSettlementGroups.map((group) => { const destination = payoutDestination(group); return <div key={group.driverId} className="rounded-2xl border border-zinc-200 p-4"><div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center"><div className="min-w-0"><div className="flex items-center gap-2"><p className="font-semibold">{group.driverName}</p><Badge variant="outline">{group.deliveryCount} {group.deliveryCount === 1 ? "entrega" : "entregas"}</Badge></div><p className="mt-2 text-sm text-zinc-500">Ganhos {money(group.driverFees)}{group.cashCollected > 0 ? ` · recebeu ${money(group.cashCollected)} dos clientes` : ""}</p><p className={`mt-1 font-semibold ${group.netBalance >= 0 ? "text-emerald-700" : "text-amber-700"}`}>{group.netBalance > 0 ? `Restaurante paga ${money(group.netBalance)}` : group.netBalance < 0 ? `Estafeta entrega ${money(Math.abs(group.netBalance))}` : "Saldo compensado: não há dinheiro a transferir"}</p><div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500">{group.payoutMethod === "bank_transfer" ? <Landmark className="size-3.5" /> : <Banknote className="size-3.5" />}<span>{payoutMethodLabel(group.payoutMethod)}{destination ? ` · ${destination}` : ""}</span>{destination ? <button type="button" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline" onClick={() => copyLink(destination)}><Copy className="size-3" /> Copiar</button> : null}</div>{group.netBalance > 0 && !destination && group.payoutMethod !== "cash" ? <p className="mt-2 flex items-center gap-1 text-xs font-medium text-red-600"><AlertCircle className="size-3.5" /> O estafeta ainda não indicou os dados de recebimento.</p> : null}</div><Button type="button" disabled={pending} className={group.netBalance < 0 ? "bg-amber-600 hover:bg-amber-700" : "bg-zinc-950 hover:bg-zinc-800"} onClick={() => openSettlement(group)}>{group.netBalance > 0 ? <WalletCards className="mr-2 size-4" /> : <ReceiptText className="mr-2 size-4" />}{group.netBalance > 0 ? "Confirmar pagamento" : group.netBalance < 0 ? "Confirmar recebimento" : "Fechar acerto"}</Button></div></div>; })}</div> : <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800"><CheckCircle2 className="size-5" /><div><p className="font-semibold">Nenhum acerto pendente</p><p className="text-sm">Os pagamentos e valores em dinheiro estão regularizados.</p></div></div>}
+
+          {earnings.some((earning) => earning.status === "settled") ? <div className="space-y-3 pt-2"><p className="text-sm font-semibold text-zinc-900">Histórico recente</p>{earnings.filter((earning) => earning.status === "settled").slice(0, 10).map((earning) => <div key={earning.id} className="flex flex-col justify-between gap-2 rounded-2xl bg-zinc-50 p-4 sm:flex-row sm:items-center"><div><p className="font-medium">{earning.drivers?.profiles?.full_name ?? "Estafeta"} · {earning.orders?.customer_name ?? "Pedido"}</p><p className="mt-1 text-sm text-zinc-500">Ganho {money(earning.driver_fee)} · {Number(earning.net_balance) >= 0 ? `pago ${money(earning.net_balance)}` : `recebido ${money(Math.abs(earning.net_balance))}`}</p>{earning.settlement_reference ? <p className="mt-1 text-xs text-zinc-400">{earning.settlement_reference}</p> : null}</div><Badge variant="outline" className="w-fit border-emerald-200 bg-emerald-50 text-emerald-700">Liquidado</Badge></div>)}</div> : null}
         </CardContent>
       </Card>
+
+      <Dialog open={Boolean(settlementGroup)} onOpenChange={(open) => { if (!open && !pending) { setSettlementGroup(null); setSettlementReference(""); } }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>{settlementGroup?.netBalance && settlementGroup.netBalance < 0 ? "Confirmar valor recebido" : "Confirmar pagamento ao estafeta"}</DialogTitle></DialogHeader>
+          {settlementGroup ? <div className="space-y-4"><div className={`rounded-2xl p-4 ${settlementGroup.netBalance < 0 ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-900"}`}><p className="text-sm">{settlementGroup.driverName}</p><p className="mt-1 text-2xl font-semibold">{money(Math.abs(settlementGroup.netBalance))}</p><p className="mt-1 text-sm">{settlementGroup.netBalance > 0 ? `Pague por ${payoutMethodLabel(settlementGroup.payoutMethod)} e confirme apenas depois de concluir.` : settlementGroup.netBalance < 0 ? "Confirme apenas depois de receber o valor do estafeta." : "Os valores recebidos e os ganhos ficaram totalmente compensados."}</p></div><div className="space-y-2"><Label htmlFor="settlementReference">Referência ou observação do acerto</Label><Input id="settlementReference" value={settlementReference} onChange={(event) => setSettlementReference(event.target.value)} placeholder="Ex.: MB WAY 13/08/2026" maxLength={160} /><p className="text-xs text-zinc-500">Esta informação ficará visível no histórico do restaurante e do estafeta.</p></div><Button type="button" className="w-full" disabled={pending || !settlementReference.trim()} onClick={settleGroup}>{pending ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <CheckCircle2 className="mr-2 size-4" />} Confirmar e guardar no histórico</Button></div> : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

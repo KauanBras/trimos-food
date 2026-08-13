@@ -114,10 +114,28 @@ export async function settleDriverEarningsAction(
   try {
     const { restaurantId, role } = await getWritableCurrentRestaurant();
     if (!canManage(role)) return { ok: false, message: "Não tem permissão para liquidar valores." };
+    const uniqueEarningIds = [...new Set(earningIds.filter(Boolean))];
+    if (!uniqueEarningIds.length) return { ok: false, message: "Não existem valores pendentes para liquidar." };
+    if (!reference.trim()) return { ok: false, message: "Indique uma referência para guardar o comprovativo do acerto." };
     const supabase = await createClient();
+    const { data: selectedEarnings, error: selectedEarningsError } = await supabase
+      .from("driver_earnings")
+      .select("id, driver_id, status")
+      .eq("restaurant_id", restaurantId)
+      .in("id", uniqueEarningIds);
+    if (selectedEarningsError) throw new Error(selectedEarningsError.message);
+    if (selectedEarnings?.length !== uniqueEarningIds.length) {
+      return { ok: false, message: "Um dos acertos já não está disponível. Atualize a página e tente novamente." };
+    }
+    if (selectedEarnings.some((earning) => earning.status !== "pending")) {
+      return { ok: false, message: "Um dos valores selecionados já foi liquidado." };
+    }
+    if (new Set(selectedEarnings.map((earning) => earning.driver_id)).size !== 1) {
+      return { ok: false, message: "Liquide os valores de um estafeta de cada vez." };
+    }
     const { data, error } = await supabase.rpc("settle_driver_earnings", {
       requested_restaurant_id: restaurantId,
-      requested_earning_ids: earningIds,
+      requested_earning_ids: uniqueEarningIds,
       requested_reference: reference.trim(),
     });
     if (error) throw new Error(error.message);
