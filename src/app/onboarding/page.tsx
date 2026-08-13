@@ -39,6 +39,7 @@ export default async function OnboardingPage({
     .select("restaurant_id")
     .eq("user_id", user.id)
     .eq("is_active", true)
+    .limit(1)
     .maybeSingle();
 
   if (membership) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getSelectedRestaurantId } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
 import { getSiteUrl, getStripe } from "@/lib/stripe/server";
 
@@ -14,12 +15,16 @@ export async function POST() {
     if (!user)
       return NextResponse.json({ error: "Sessão expirada." }, { status: 401 });
 
-    const { data: membership } = await supabase
-      .from("restaurant_users")
-      .select("restaurant_id, role")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
+    const restaurantId = await getSelectedRestaurantId(supabase, user.id);
+    const { data: membership } = restaurantId
+      ? await supabase
+        .from("restaurant_users")
+        .select("restaurant_id, role")
+        .eq("user_id", user.id)
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true)
+        .maybeSingle()
+      : { data: null };
     if (!membership || !["owner", "admin"].includes(membership.role)) {
       return NextResponse.json(
         { error: "Sem permissão para gerir a assinatura." },

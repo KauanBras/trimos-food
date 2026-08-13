@@ -26,6 +26,7 @@ export async function getAuthDestination(
       .select("restaurant_id, role")
       .eq("user_id", userId)
       .eq("is_active", true)
+      .limit(1)
       .maybeSingle(),
 
     supabase

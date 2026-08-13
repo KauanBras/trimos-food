@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getSelectedRestaurantId } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
 import { getSiteUrl, getStripe } from "@/lib/stripe/server";
 
@@ -27,24 +28,25 @@ export async function POST(request: Request) {
     if (!user)
       return NextResponse.json({ error: "Sessão expirada." }, { status: 401 });
 
-    const { data: membership } = await supabase
-      .from("restaurant_users")
-      .select("restaurant_id, role, restaurants(name, is_demo, demo_locked)")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
+    const restaurantId = await getSelectedRestaurantId(supabase, user.id);
+    const { data: membership } = restaurantId
+      ? await supabase
+        .from("restaurant_users")
+        .select("restaurant_id, role, restaurants(name, is_demo, demo_locked)")
+        .eq("user_id", user.id)
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true)
+        .maybeSingle()
+      : { data: null };
     if (!membership || !["owner", "admin"].includes(membership.role)) {
       return NextResponse.json(
         { error: "Sem permissão para gerir a assinatura." },
         { status: 403 },
       );
     }
-    if (
-      membership.restaurants?.is_demo &&
-      membership.restaurants.demo_locked
-    ) {
+    if (membership.restaurants?.is_demo) {
       return NextResponse.json(
-        { error: "A demonstração protegida não pode iniciar cobranças." },
+        { error: "A demonstração não pode iniciar cobranças." },
         { status: 409 },
       );
     }

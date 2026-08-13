@@ -34,9 +34,9 @@ export async function POST(request: Request) {
       .eq("id", order.restaurantId)
       .single();
     if (restaurantError) throw new Error(restaurantError.message);
-    if (restaurant.is_demo && restaurant.demo_locked) {
+    if (restaurant.is_demo) {
       return NextResponse.json(
-        { error: "A demonstração protegida não realiza pagamentos reais." },
+        { error: "A demonstração não realiza pagamentos reais." },
         { status: 409 },
       );
     }

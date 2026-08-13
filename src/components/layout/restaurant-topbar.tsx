@@ -28,6 +28,8 @@ type RestaurantTopbarProps = {
   newOrderCount: number;
   onboardingProgress?: number;
   isPlatformAdmin?: boolean;
+  restaurantMembershipCount?: number;
+  isDemo?: boolean;
 };
 
 function initials(value: string) {

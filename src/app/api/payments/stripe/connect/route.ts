@@ -5,6 +5,7 @@ import {
   getSiteUrl,
   getStripe,
 } from "@/lib/stripe/server";
+import { getSelectedRestaurantId } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST() {
@@ -13,8 +14,12 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Inicie sessão novamente." }, { status: 401 });
 
-    const { data: membership } = await supabase.from("restaurant_users")
-      .select("restaurant_id, role").eq("user_id", user.id).eq("is_active", true).maybeSingle();
+    const restaurantId = await getSelectedRestaurantId(supabase, user.id);
+    const { data: membership } = restaurantId
+      ? await supabase.from("restaurant_users")
+        .select("restaurant_id, role").eq("user_id", user.id)
+        .eq("restaurant_id", restaurantId).eq("is_active", true).maybeSingle()
+      : { data: null };
     if (!membership || !["owner", "admin"].includes(membership.role)) {
       return NextResponse.json({ error: "Apenas o proprietário ou administrador pode ligar pagamentos." }, { status: 403 });
     }
@@ -24,9 +29,9 @@ export async function POST() {
       supabase.from("restaurant_settings").select("stripe_account_id").eq("restaurant_id", membership.restaurant_id).single(),
     ]);
     if (!restaurant || !settings) return NextResponse.json({ error: "Restaurante não encontrado." }, { status: 404 });
-    if (restaurant.is_demo && restaurant.demo_locked) {
+    if (restaurant.is_demo) {
       return NextResponse.json(
-        { error: "A demonstração protegida não pode ligar pagamentos." },
+        { error: "A demonstração não pode ligar pagamentos reais." },
         { status: 409 },
       );
     }

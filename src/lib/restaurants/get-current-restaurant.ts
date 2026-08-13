@@ -1,8 +1,40 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database";
 
-export async function getCurrentRestaurant() {
+export const CURRENT_RESTAURANT_COOKIE = "trimos_restaurant_id";
+
+export async function getSelectedRestaurantId(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+) {
+  const { data: memberships, error } = await supabase
+    .from("restaurant_users")
+    .select("restaurant_id, restaurants(is_demo)")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`Não foi possível carregar os restaurantes: ${error.message}`);
+  }
+
+  const cookieStore = await cookies();
+  const selectedRestaurantId = cookieStore.get(CURRENT_RESTAURANT_COOKIE)?.value;
+  return (
+    memberships?.find((item) => item.restaurant_id === selectedRestaurantId)
+      ?.restaurant_id ??
+    memberships?.find((item) => item.restaurants && !item.restaurants.is_demo)
+      ?.restaurant_id ??
+    memberships?.[0]?.restaurant_id ??
+    null
+  );
+}
+
+export async function getRestaurantMemberships() {
   const supabase = await createClient();
 
   const {
@@ -13,7 +45,7 @@ export async function getCurrentRestaurant() {
     redirect("/login");
   }
 
-  const { data: membership, error: membershipError } = await supabase
+  const { data: memberships, error } = await supabase
     .from("restaurant_users")
     .select(`
       role,
@@ -43,23 +75,45 @@ export async function getCurrentRestaurant() {
     `)
     .eq("user_id", user.id)
     .eq("is_active", true)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
 
-  if (membershipError) {
-    throw new Error(
-      `Não foi possível carregar o restaurante: ${membershipError.message}`
-    );
+  if (error) {
+    throw new Error(`Não foi possível carregar os restaurantes: ${error.message}`);
   }
 
-  if (!membership || !membership.restaurants) {
+  return { supabase, user, memberships: memberships ?? [] };
+}
+
+export async function getCurrentRestaurant() {
+  const { supabase, user, memberships } = await getRestaurantMemberships();
+
+  if (memberships.length === 0) {
+    redirect("/onboarding");
+  }
+
+  const cookieStore = await cookies();
+  const selectedRestaurantId = cookieStore.get(CURRENT_RESTAURANT_COOKIE)?.value;
+  const membership =
+    memberships.find(
+      (item) =>
+        item.restaurant_id === selectedRestaurantId && item.restaurants,
+    ) ??
+    memberships.find(
+      (item) => item.restaurants && !item.restaurants.is_demo,
+    ) ??
+    memberships.find((item) => item.restaurants);
+
+  if (!membership?.restaurants) {
     redirect("/onboarding");
   }
 
   return {
+    supabase,
     user,
     role: membership.role,
     restaurantId: membership.restaurant_id,
     restaurant: membership.restaurants,
+    membershipCount: memberships.length,
   };
 }
 

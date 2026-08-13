@@ -1,38 +1,22 @@
-import { redirect } from "next/navigation";
-
 import { RestaurantSidebar } from "@/components/layout/restaurant-sidebar";
 import { RestaurantTopbar } from "@/components/layout/restaurant-topbar";
 import { RestaurantAudioProvider } from "@/features/notifications/components/restaurant-audio-provider";
+import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { getRestaurantOperatingStatus } from "@/lib/restaurants/operating-status";
-import { createClient } from "@/lib/supabase/server";
 
 export default async function RestaurantLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: membership } = await supabase
-    .from("restaurant_users")
-    .select("restaurant_id, role, restaurants(name, slug, logo_url, timezone)")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (!membership || !membership.restaurants) {
-    redirect("/onboarding");
-  }
-
-  const restaurant = membership.restaurants;
+    supabase,
+    user,
+    role,
+    restaurantId,
+    restaurant,
+    membershipCount,
+  } = await getCurrentRestaurant();
   const [
     { data: profile },
     { data: settings },
@@ -48,21 +32,21 @@ export default async function RestaurantLayout({
     supabase
       .from("restaurant_settings")
       .select("order_sound_enabled")
-      .eq("restaurant_id", membership.restaurant_id)
+      .eq("restaurant_id", restaurantId)
       .maybeSingle(),
     supabase
       .from("business_hours")
       .select("day_of_week, opens_at, closes_at, is_closed")
-      .eq("restaurant_id", membership.restaurant_id),
+      .eq("restaurant_id", restaurantId),
     supabase
       .from("orders")
       .select("id", { count: "exact", head: true })
-      .eq("restaurant_id", membership.restaurant_id)
+      .eq("restaurant_id", restaurantId)
       .eq("status", "new"),
     supabase
       .from("restaurant_onboarding")
       .select("progress_percent")
-      .eq("restaurant_id", membership.restaurant_id)
+      .eq("restaurant_id", restaurantId)
       .maybeSingle(),
   ]);
 
@@ -83,16 +67,18 @@ export default async function RestaurantLayout({
     operatingLabel: operatingStatus.label,
     userName,
     userAvatarUrl: profile?.avatar_url ?? null,
-    role: membership.role,
+    role,
     newOrderCount: newOrders.count ?? 0,
     onboardingProgress: onboarding?.progress_percent ?? 0,
     isPlatformAdmin: profile?.platform_role === "super_admin",
+    restaurantMembershipCount: membershipCount,
+    isDemo: restaurant.is_demo,
   };
 
   return (
     <div className="flex min-h-screen bg-zinc-50 text-zinc-950">
       <RestaurantAudioProvider
-        restaurantId={membership.restaurant_id}
+        restaurantId={restaurantId}
         initialNewOrders={newOrders.count ?? 0}
         enabled={settings?.order_sound_enabled ?? true}
       />

@@ -41,6 +41,7 @@ export default async function SelectRolePage() {
       .select("restaurant_id, role")
       .eq("user_id", user.id)
       .eq("is_active", true)
+      .limit(1)
       .maybeSingle(),
 
     supabase

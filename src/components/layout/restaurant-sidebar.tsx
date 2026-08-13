@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BadgeCheck,
+  ArrowLeftRight,
   BarChart3,
   Bike,
   CalendarDays,
@@ -57,6 +58,8 @@ type RestaurantSidebarProps = {
   newOrderCount: number;
   onboardingProgress?: number;
   isPlatformAdmin?: boolean;
+  restaurantMembershipCount?: number;
+  isDemo?: boolean;
   mobile?: boolean;
 };
 
@@ -80,6 +83,8 @@ export function RestaurantSidebar({
   newOrderCount,
   onboardingProgress = 100,
   isPlatformAdmin = false,
+  restaurantMembershipCount = 1,
+  isDemo = false,
   mobile = false,
 }: RestaurantSidebarProps) {
   const pathname = usePathname();
@@ -112,6 +117,11 @@ export function RestaurantSidebar({
             <p className="truncate text-sm font-semibold text-zinc-950">
               {restaurantName}
             </p>
+            {isDemo ? (
+              <Badge variant="outline" className="mt-1 border-amber-300 bg-amber-50 text-[10px] text-amber-800">
+                Demonstração
+              </Badge>
+            ) : null}
             <div className="mt-1 flex items-center gap-2">
               <span
                 className={cn(
@@ -216,6 +226,15 @@ export function RestaurantSidebar({
       </div>
 
       <div className="border-t border-zinc-200 p-3">
+        {restaurantMembershipCount > 1 ? (
+          <Link
+            href="/restaurant/switch"
+            className="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-600 transition hover:bg-amber-50 hover:text-zinc-950"
+          >
+            <ArrowLeftRight className="size-[18px] text-amber-600" />
+            Trocar restaurante
+          </Link>
+        ) : null}
         <Link
           href="/restaurant/billing"
           className="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950"
