@@ -272,18 +272,23 @@ export default async function RestaurantDashboardPage() {
               {greeting}, {displayName}.
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-400">
-              {restaurant.name} tem {activeOrders.length} pedido{activeOrders.length === 1 ? "" : "s"} ativo{activeOrders.length === 1 ? "" : "s"} e {todayReservations.length} reserva{todayReservations.length === 1 ? "" : "s"} para hoje.
+              {restaurant.name} tem {activeOrders.length} pedido{activeOrders.length === 1 ? "" : "s"} ativo{activeOrders.length === 1 ? "" : "s"}
+              {restaurant.accepts_reservations
+                ? ` e ${todayReservations.length} reserva${todayReservations.length === 1 ? "" : "s"} para hoje.`
+                : ". As reservas estão desativadas; delivery e takeaway continuam ativos."}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button
-              render={<Link href="/restaurant/reservations" />}
-              nativeButton={false}
-              variant="outline"
-              className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-            >
-              Ver reservas
-            </Button>
+            {restaurant.accepts_reservations ? (
+              <Button
+                render={<Link href="/restaurant/reservations" />}
+                nativeButton={false}
+                variant="outline"
+                className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              >
+                Ver reservas
+              </Button>
+            ) : null}
             <Button
               render={<Link href="/restaurant/orders" />}
               nativeButton={false}
@@ -382,7 +387,7 @@ export default async function RestaurantDashboardPage() {
                 { icon: ChefHat, label: "Em preparação", detail: "Cozinha ativa", value: kitchenOrders.length },
                 { icon: Bike, label: "Estafetas online", detail: "Disponíveis agora", value: availableDrivers },
                 { icon: CalendarDays, label: "Reservas hoje", detail: `${expectedGuests} pessoas previstas`, value: todayReservations.length },
-              ].map((item) => (
+              ].filter((item) => restaurant.accepts_reservations || item.label !== "Reservas hoje").map((item) => (
                 <div key={item.label} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="rounded-xl bg-zinc-100 p-2"><item.icon className="size-4 text-zinc-600" /></div>
@@ -394,7 +399,7 @@ export default async function RestaurantDashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-zinc-200 bg-amber-50 shadow-none">
+          {restaurant.accepts_reservations ? <Card className="border-zinc-200 bg-amber-50 shadow-none">
             <CardContent className="p-5">
               <div className="flex items-start gap-4">
                 <div className="rounded-2xl bg-amber-400 p-3 text-zinc-950"><UtensilsCrossed className="size-5" /></div>
@@ -409,7 +414,7 @@ export default async function RestaurantDashboardPage() {
               </div>
               <Button render={<Link href="/restaurant/reservations" />} nativeButton={false} variant="outline" className="mt-5 w-full border-amber-300 bg-white/70">Ver reservas</Button>
             </CardContent>
-          </Card>
+          </Card> : null}
         </div>
       </section>
 

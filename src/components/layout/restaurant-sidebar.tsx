@@ -60,6 +60,7 @@ type RestaurantSidebarProps = {
   isPlatformAdmin?: boolean;
   restaurantMembershipCount?: number;
   isDemo?: boolean;
+  reservationsEnabled?: boolean;
   mobile?: boolean;
 };
 
@@ -85,6 +86,7 @@ export function RestaurantSidebar({
   isPlatformAdmin = false,
   restaurantMembershipCount = 1,
   isDemo = false,
+  reservationsEnabled = true,
   mobile = false,
 }: RestaurantSidebarProps) {
   const pathname = usePathname();
@@ -159,7 +161,7 @@ export function RestaurantSidebar({
             <span className="text-xs">{onboardingProgress}%</span>
           </Link>
         ) : null}
-        {navigation.map((item) => {
+        {navigation.filter((item) => reservationsEnabled || item.href !== "/restaurant/reservations").map((item) => {
           const Icon = item.icon;
           const active =
             pathname === item.href ||
@@ -221,7 +223,9 @@ export function RestaurantSidebar({
           <p className="text-sm font-semibold">Trimos Food</p>
         </div>
         <p className="mt-2 text-xs leading-5 text-amber-800/70">
-          Pedidos, reservas, clientes e estafetas no mesmo painel.
+          {reservationsEnabled
+            ? "Pedidos, reservas, clientes e estafetas no mesmo painel."
+            : "Pedidos, clientes e estafetas no mesmo painel."}
         </p>
       </div>
 

@@ -30,6 +30,7 @@ type RestaurantTopbarProps = {
   isPlatformAdmin?: boolean;
   restaurantMembershipCount?: number;
   isDemo?: boolean;
+  reservationsEnabled?: boolean;
 };
 
 function initials(value: string) {
@@ -73,7 +74,7 @@ export function RestaurantTopbar(props: RestaurantTopbarProps) {
             name="q"
             type="search"
             aria-label="Procurar no restaurante"
-            placeholder="Procurar pedidos, clientes ou reservas..."
+            placeholder={props.reservationsEnabled === false ? "Procurar pedidos ou clientes..." : "Procurar pedidos, clientes ou reservas..."}
             className="h-10 border-zinc-200 bg-zinc-50 pl-9 shadow-none"
           />
         </form>

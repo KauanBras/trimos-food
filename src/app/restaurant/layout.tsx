@@ -73,6 +73,7 @@ export default async function RestaurantLayout({
     isPlatformAdmin: profile?.platform_role === "super_admin",
     restaurantMembershipCount: membershipCount,
     isDemo: restaurant.is_demo,
+    reservationsEnabled: restaurant.accepts_reservations,
   };
 
   return (

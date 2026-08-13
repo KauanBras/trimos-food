@@ -166,6 +166,9 @@ export function RestaurantSettingsForm({
   const [reservationDiscountEnabled, setReservationDiscountEnabled] = useState(
     settings.reservation_discount_enabled,
   );
+  const [acceptsReservations, setAcceptsReservations] = useState(
+    restaurant.accepts_reservations,
+  );
   const [deliveryOrigin, setDeliveryOrigin] = useState({
     latitude: settings.delivery_origin_latitude,
     longitude: settings.delivery_origin_longitude,
@@ -412,7 +415,7 @@ export function RestaurantSettingsForm({
           <TabsTrigger value="payments" className="gap-2">
             <WalletCards className="size-4" /> Pagamentos
           </TabsTrigger>
-          <TabsTrigger value="reservations" className="gap-2">
+          <TabsTrigger value="reservations" className="gap-2" disabled={!acceptsReservations}>
             <UtensilsCrossed className="size-4" /> Reservas
           </TabsTrigger>
           <TabsTrigger value="hours" className="gap-2">
@@ -567,13 +570,23 @@ export function RestaurantSettingsForm({
                 ["acceptsDelivery", "Entrega", restaurant.accepts_delivery],
                 ["acceptsPickup", "Levantamento", restaurant.accepts_pickup],
                 ["acceptsDineIn", "Consumo no restaurante", restaurant.accepts_dine_in],
-                ["acceptsReservations", "Reservas", restaurant.accepts_reservations],
+                ["acceptsReservations", "Reservas", acceptsReservations],
               ].map(([name, label, enabled]) => (
                 <label key={String(name)} className="flex items-center justify-between rounded-2xl border border-zinc-200 p-4">
                   <span className="font-medium">{String(label)}</span>
-                  <Switch name={String(name)} defaultChecked={Boolean(enabled)} />
+                  <Switch
+                    name={String(name)}
+                    checked={String(name) === "acceptsReservations" ? acceptsReservations : undefined}
+                    defaultChecked={String(name) === "acceptsReservations" ? undefined : Boolean(enabled)}
+                    onCheckedChange={String(name) === "acceptsReservations" ? setAcceptsReservations : undefined}
+                  />
                 </label>
               ))}
+              {!acceptsReservations ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 sm:col-span-2">
+                  O módulo de reservas ficará oculto. Delivery e takeaway continuam a funcionar normalmente e nenhuma reserva antiga será apagada.
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
