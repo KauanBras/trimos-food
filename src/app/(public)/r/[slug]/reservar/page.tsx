@@ -4,13 +4,14 @@ import { notFound } from "next/navigation";
 
 import { PublicReservationForm } from "@/features/reservations/components/public-reservation-form";
 import { createClient } from "@/lib/supabase/server";
+import { DemoModeBanner } from "@/components/public/demo-mode-banner";
 
 export default async function PublicReservationPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const supabase = await createClient();
   const { data: restaurant } = await supabase
     .from("restaurants")
-    .select("id, name, slug, accepts_reservations, status, business_hours(day_of_week, opens_at, closes_at, is_closed)")
+    .select("id, name, slug, accepts_reservations, status, is_demo, business_hours(day_of_week, opens_at, closes_at, is_closed)")
     .eq("slug", slug)
     .eq("status", "active")
     .maybeSingle();
@@ -25,6 +26,7 @@ export default async function PublicReservationPage({ params }: { params: Promis
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-amber-50 via-zinc-50 to-zinc-50 px-4 py-8 sm:py-14">
+      {restaurant.is_demo ? <div className="-mx-4 -mt-8 mb-8 sm:-mt-14 sm:mb-12"><DemoModeBanner compact /></div> : null}
       <div className="mx-auto max-w-2xl">
         <Link href={`/r/${slug}`} className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-950"><ArrowLeft className="size-4" /> Voltar ao menu</Link>
         <div className="my-8 text-center">

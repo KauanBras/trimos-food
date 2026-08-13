@@ -10,7 +10,7 @@ export default async function RestaurantSettingsPage() {
   const [restaurantResult, settingsResult, hoursResult] = await Promise.all([
     supabase
       .from("restaurants")
-      .select("name, slug, description, logo_url, cover_url, phone, email, tax_number, address_line, city, postal_code, accepts_delivery, accepts_pickup, accepts_dine_in, accepts_reservations")
+      .select("name, slug, description, logo_url, cover_url, phone, email, tax_number, address_line, city, postal_code, accepts_delivery, accepts_pickup, accepts_dine_in, accepts_reservations, is_demo")
       .eq("id", restaurantId)
       .single(),
     supabase

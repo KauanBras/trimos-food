@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { readCart, type CartItem, writeCart } from "@/features/cart/types";
 import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/database";
+import { DemoModeBanner } from "@/components/public/demo-mode-banner";
 
 type Props = {
   restaurant: {
@@ -25,6 +26,7 @@ type Props = {
     acceptsDineIn: boolean;
     isOpen: boolean;
     operatingLabel: string;
+    isDemo: boolean;
   };
   settings: {
     minimumOrderAmount: number;
@@ -164,6 +166,10 @@ export function PublicCheckoutClient({ restaurant, settings, table }: Props) {
     setSubmitting(true);
     const formData = new FormData(event.currentTarget);
     const supabase = createClient();
+    const enteredNotes = String(formData.get("orderNotes") ?? "");
+    const contextualNotes = orderType === "dine_in" && table
+      ? `[[TRIMOS_TABLE:${table.code}]] ${enteredNotes}`.trim()
+      : enteredNotes;
     const orderRequest = {
       requested_restaurant_id: restaurant.id,
       requested_customer_name: String(formData.get("customerName") ?? ""),
@@ -176,9 +182,9 @@ export function PublicCheckoutClient({ restaurant, settings, table }: Props) {
           : "",
       requested_delivery_latitude: orderType === "delivery" ? deliveryLocation?.latitude ?? null : null,
       requested_delivery_longitude: orderType === "delivery" ? deliveryLocation?.longitude ?? null : null,
-      requested_notes: orderType === "dine_in" && table
-        ? `[[TRIMOS_TABLE:${table.code}]] ${String(formData.get("orderNotes") ?? "")}`.trim()
-        : String(formData.get("orderNotes") ?? ""),
+      requested_notes: restaurant.isDemo
+        ? `${contextualNotes}${contextualNotes ? "\n" : ""}[PEDIDO DE DEMONSTRAÇÃO]`
+        : contextualNotes,
       requested_items: items.map((item) => ({
         productId: item.productId,
         variantId: item.variant?.id ?? null,
@@ -239,8 +245,10 @@ export function PublicCheckoutClient({ restaurant, settings, table }: Props) {
   if (!loaded) return <main className="min-h-screen bg-zinc-50" />;
   if (!items.length)
     return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-50 p-4">
-        <Card className="w-full max-w-md text-center shadow-none">
+      <main className="min-h-screen bg-zinc-50">
+        {restaurant.isDemo ? <DemoModeBanner compact /> : null}
+        <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center p-4">
+          <Card className="w-full max-w-md text-center shadow-none">
           <CardContent className="p-10">
             <ShoppingBag className="mx-auto size-10 text-zinc-300" />
             <h1 className="mt-4 text-xl font-semibold">
@@ -256,12 +264,14 @@ export function PublicCheckoutClient({ restaurant, settings, table }: Props) {
               Voltar ao menu
             </Link>
           </CardContent>
-        </Card>
+          </Card>
+        </div>
       </main>
     );
 
   return (
     <main className="min-h-screen bg-zinc-50 pb-10">
+      {restaurant.isDemo ? <DemoModeBanner compact /> : null}
       <form onSubmit={submit} className="mx-auto max-w-5xl px-4 py-6">
         <Link
           href={`/r/${restaurant.slug}${table ? `?table=${encodeURIComponent(table.code)}` : ""}`}
@@ -559,7 +569,9 @@ export function PublicCheckoutClient({ restaurant, settings, table }: Props) {
                   {submitting
                     ? "A enviar..."
                     : restaurant.isOpen
-                      ? `Confirmar pedido · ${money.format(total)}`
+                      ? restaurant.isDemo
+                        ? `Criar pedido de demonstração · ${money.format(total)}`
+                        : `Confirmar pedido · ${money.format(total)}`
                       : "Restaurante fechado"}
                 </Button>
                 <p className="text-center text-xs text-zinc-500">

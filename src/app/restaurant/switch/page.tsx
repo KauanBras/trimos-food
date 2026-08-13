@@ -1,4 +1,5 @@
-import { CheckCircle2, MonitorPlay, Store } from "lucide-react";
+import { CheckCircle2, ExternalLink, MonitorPlay, Store } from "lucide-react";
+import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -70,19 +71,24 @@ export default async function SwitchRestaurantPage({
                     </p>
                   </div>
 
-                  <form action={selectRestaurantAction}>
-                    <input type="hidden" name="restaurantId" value={membership.restaurant_id} />
-                    <input type="hidden" name="destination" value="/restaurant/dashboard" />
-                    <Button type="submit" variant={selected ? "outline" : "default"}>
-                      {selected ? (
-                        <>
-                          <CheckCircle2 className="size-4" /> Em utilização
-                        </>
-                      ) : (
-                        "Entrar"
-                      )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" render={<Link href={`/r/${restaurant.slug}`} target="_blank" />} nativeButton={false}>
+                      <ExternalLink className="size-4" /> Menu do cliente
                     </Button>
-                  </form>
+                    <form action={selectRestaurantAction}>
+                      <input type="hidden" name="restaurantId" value={membership.restaurant_id} />
+                      <input type="hidden" name="destination" value="/restaurant/dashboard" />
+                      <Button type="submit" variant={selected ? "outline" : "default"}>
+                        {selected ? (
+                          <>
+                            <CheckCircle2 className="size-4" /> Em utilização
+                          </>
+                        ) : (
+                          "Entrar"
+                        )}
+                      </Button>
+                    </form>
+                  </div>
                 </CardContent>
               </Card>
             );

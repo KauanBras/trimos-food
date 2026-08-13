@@ -56,6 +56,7 @@ type Restaurant = {
   accepts_pickup: boolean;
   accepts_dine_in: boolean;
   accepts_reservations: boolean;
+  is_demo: boolean;
 };
 
 type Settings = {
@@ -371,12 +372,16 @@ export function RestaurantSettingsForm({
       <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-white shadow-none">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-zinc-950">Link para os clientes</p>
+            <p className="font-semibold text-zinc-950">
+              {restaurant.is_demo ? "Link da demonstração para clientes" : "Link real para os clientes"}
+            </p>
             <p className="mt-1 truncate text-sm text-zinc-600">
               /r/{restaurant.slug}
             </p>
             <p className="mt-1 text-xs text-zinc-500">
-              Partilhe este endereço no Instagram, WhatsApp, Google ou num QR Code.
+              {restaurant.is_demo
+                ? "Partilhe este endereço nas apresentações. Os testes ficam isolados da operação real."
+                : "Partilhe este endereço no Instagram, WhatsApp, Google ou num QR Code."}
             </p>
           </div>
 

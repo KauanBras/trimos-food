@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/server";
 import { PublicCartButton } from "@/features/cart/components/public-cart-button";
 import { getRestaurantOperatingStatus } from "@/lib/restaurants/operating-status";
+import { DemoModeBanner } from "@/components/public/demo-mode-banner";
 
 type PublicRestaurantPageProps = {
   params: Promise<{
@@ -65,7 +66,8 @@ export default async function PublicRestaurantPage({
       accepts_dine_in,
       accepts_reservations,
       timezone,
-      status
+      status,
+      is_demo
     `)
     .eq("slug", slug)
     .eq("status", "active")
@@ -179,6 +181,9 @@ export default async function PublicRestaurantPage({
     businessHours ?? [],
     restaurant.timezone,
   );
+  const publicOperatingStatus = restaurant.is_demo
+    ? { isOpen: true, label: "Aberto para demonstração" }
+    : operatingStatus;
   const visibleProducts = (products ?? []).filter((product) => {
     if (!query) return true;
     const term = query.toLocaleLowerCase("pt-PT");
@@ -190,6 +195,7 @@ export default async function PublicRestaurantPage({
 
   return (
     <main className="min-h-screen bg-zinc-50 pb-28">
+      {restaurant.is_demo ? <DemoModeBanner /> : null}
       <PublicCartButton restaurantId={restaurant.id} slug={restaurant.slug} tableCode={tableContext?.code} />
       <section className="relative">
         <div className="relative h-48 w-full overflow-hidden bg-zinc-900 sm:h-64">
@@ -232,12 +238,12 @@ export default async function PublicRestaurantPage({
             <div className="pb-2">
               <Badge
                 className={`mb-2 text-white ${
-                  operatingStatus.isOpen
+                  publicOperatingStatus.isOpen
                     ? "bg-emerald-500 hover:bg-emerald-500"
                     : "bg-zinc-500 hover:bg-zinc-500"
                 }`}
               >
-                {operatingStatus.label}
+                {publicOperatingStatus.label}
               </Badge>
 
               <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">

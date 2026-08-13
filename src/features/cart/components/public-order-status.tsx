@@ -8,6 +8,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
+import { DemoModeBanner } from "@/components/public/demo-mode-banner";
 
 export type PublicOrderSummary = {
   id: string;
@@ -49,11 +50,13 @@ export function PublicOrderStatus({
   token,
   slug,
   currencyCode,
+  isDemo,
 }: {
   initialOrder: PublicOrderSummary;
   token: string;
   slug: string;
   currencyCode: string;
+  isDemo: boolean;
 }) {
   const [order, setOrder] = useState(initialOrder);
   const [startingPayment, setStartingPayment] = useState(false);
@@ -96,6 +99,7 @@ export function PublicOrderStatus({
 
   return (
     <main className="min-h-screen bg-zinc-50 p-4 py-10">
+      {isDemo ? <div className="-mx-4 -mt-10 mb-8"><DemoModeBanner compact /></div> : null}
       <Card className="mx-auto max-w-2xl shadow-none">
         <CardContent className="space-y-6 p-6 sm:p-8">
           <div className="text-center">

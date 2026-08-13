@@ -9,6 +9,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { readCart, writeCart } from "@/features/cart/types";
 import { PublicCartButton } from "@/features/cart/components/public-cart-button";
+import { DemoModeBanner } from "@/components/public/demo-mode-banner";
 
 type Variant = { id: string; name: string; price: number };
 type ModifierOption = {
@@ -26,7 +27,7 @@ type ModifierGroup = {
 };
 
 type Props = {
-  restaurant: { id: string; slug: string; currencyCode: string };
+  restaurant: { id: string; slug: string; currencyCode: string; isDemo: boolean };
   product: {
     id: string;
     name: string;
@@ -138,6 +139,7 @@ export function PublicProductConfigurator({
 
   return (
     <main className="min-h-screen bg-zinc-50 pb-32">
+      {restaurant.isDemo ? <DemoModeBanner compact /> : null}
       <PublicCartButton restaurantId={restaurant.id} slug={restaurant.slug} tableCode={tableCode} />
       <div className="mx-auto max-w-3xl px-4 py-6">
         <Link
