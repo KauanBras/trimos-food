@@ -28,6 +28,18 @@ export async function POST(request: Request) {
     if (error || !data) return NextResponse.json({ error: error?.message ?? "Pedido não encontrado." }, { status: 404 });
 
     const order = data as Json as CheckoutOrder;
+    const { data: restaurant, error: restaurantError } = await supabase
+      .from("restaurants")
+      .select("is_demo, demo_locked")
+      .eq("id", order.restaurantId)
+      .single();
+    if (restaurantError) throw new Error(restaurantError.message);
+    if (restaurant.is_demo && restaurant.demo_locked) {
+      return NextResponse.json(
+        { error: "A demonstração protegida não realiza pagamentos reais." },
+        { status: 409 },
+      );
+    }
     if (!order.stripeReady || !order.stripeAccountId) return NextResponse.json({ error: "O MB WAY ainda não está ativo neste restaurante." }, { status: 409 });
     if (order.currencyCode.toUpperCase() !== "EUR") return NextResponse.json({ error: "O MB WAY requer pagamentos em euros." }, { status: 409 });
 
