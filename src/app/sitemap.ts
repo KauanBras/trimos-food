@@ -8,10 +8,10 @@ const siteUrl =
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = await createClient();
   const { data: restaurants } = await supabase
-    .from("restaurants")
-    .select("slug, updated_at")
+    .from("public_restaurants")
+    .select("slug")
     .eq("status", "active")
-    .order("updated_at", { ascending: false });
+    .order("slug", { ascending: true });
 
   return [
     {
@@ -41,7 +41,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     ...(restaurants ?? []).map((restaurant) => ({
       url: `${siteUrl}/r/${restaurant.slug}`,
-      lastModified: restaurant.updated_at,
       changeFrequency: "daily" as const,
       priority: 1,
     })),

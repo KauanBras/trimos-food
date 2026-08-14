@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const supabase = await createClient();
   const { error } = await supabase
-    .from("restaurants")
+    .from("public_restaurants")
     .select("id")
     .eq("status", "active")
     .limit(1);
