@@ -10,7 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createClient } from "@/lib/supabase/client";
 
 type BusinessHour = {
   day_of_week: number;
@@ -89,7 +88,6 @@ export function PublicReservationForm({
   promotion: ReservationPromotion;
 }) {
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
   const today = useMemo(() => lisbonClock(new Date(initialNow)), [initialNow]);
   const maximumDate = useMemo(
     () => addDays(today.date, advanceDays),
@@ -158,27 +156,36 @@ export function PublicReservationForm({
     }
 
     setSubmitting(true);
-    const { data, error } = await supabase.rpc("create_public_reservation", {
-      requested_restaurant_id: restaurantId,
-      requested_customer_name: String(formData.get("customerName") ?? ""),
-      requested_customer_phone: String(formData.get("customerPhone") ?? ""),
-      requested_customer_email: String(formData.get("customerEmail") ?? ""),
-      requested_date: date,
-      requested_time: time,
-      requested_party_size: Number(formData.get("partySize")),
-      requested_special_requests: String(formData.get("specialRequests") ?? ""),
+    const response = await fetch("/api/public/reservations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        requested_restaurant_id: restaurantId,
+        requested_customer_name: String(formData.get("customerName") ?? ""),
+        requested_customer_phone: String(formData.get("customerPhone") ?? ""),
+        requested_customer_email: String(formData.get("customerEmail") ?? ""),
+        requested_date: date,
+        requested_time: time,
+        requested_party_size: Number(formData.get("partySize")),
+        requested_special_requests: String(formData.get("specialRequests") ?? ""),
+      }),
     });
+    const data = (await response.json()) as {
+      reservation_id?: string;
+      reservation_token?: string;
+      error?: string;
+    };
     setSubmitting(false);
 
-    if (error || !data?.[0]) {
+    if (!response.ok || !data.reservation_id || !data.reservation_token) {
       toast.error("Não foi possível concluir a reserva", {
-        description: error?.message ?? "Tente novamente.",
+        description: data.error ?? "Tente novamente.",
       });
       return;
     }
 
     router.push(
-      `/r/${slug}/reserva/${data[0].reservation_id}?token=${data[0].reservation_token}`,
+      `/r/${slug}/reserva/${data.reservation_id}?token=${data.reservation_token}`,
     );
   }
 

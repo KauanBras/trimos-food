@@ -28,7 +28,7 @@ export default async function PublicCartPage({ params, searchParams }: Props) {
   const { table } = await searchParams;
   const tableCode = table?.trim().toUpperCase().slice(0, 40) ?? "";
   const supabase = await createClient();
-  const { data: restaurant } = await supabase.from("restaurants").select("id, name, slug, currency_code, accepts_delivery, accepts_pickup, accepts_dine_in, timezone, is_demo").eq("slug", slug).eq("status", "active").maybeSingle();
+  const { data: restaurant } = await supabase.from("public_restaurants").select("id, name, slug, currency_code, accepts_delivery, accepts_pickup, accepts_dine_in, timezone, is_demo").eq("slug", slug).eq("status", "active").maybeSingle();
   if (!restaurant) notFound();
   const [{ data }, { data: businessHours }, { data: tableData }] = await Promise.all([
     supabase.rpc("get_public_checkout_settings", { requested_restaurant_id: restaurant.id }),

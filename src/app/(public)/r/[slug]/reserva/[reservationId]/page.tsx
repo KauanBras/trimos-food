@@ -32,7 +32,7 @@ export default async function ReservationStatusPage({
       requested_reservation_id: reservationId,
       requested_reservation_token: query.token,
     }),
-    supabase.from("restaurants").select("is_demo").eq("slug", slug).eq("status", "active").maybeSingle(),
+    supabase.from("public_restaurants").select("is_demo").eq("slug", slug).eq("status", "active").maybeSingle(),
   ]);
   if (error || !data || !restaurant) notFound();
   const reservation = data as ReservationPayload;

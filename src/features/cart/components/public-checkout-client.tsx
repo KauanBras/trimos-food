@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { readCart, type CartItem, writeCart } from "@/features/cart/types";
-import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/database";
 import { DemoModeBanner } from "@/components/public/demo-mode-banner";
 
@@ -165,7 +164,6 @@ export function PublicCheckoutClient({ restaurant, settings, table }: Props) {
     }
     setSubmitting(true);
     const formData = new FormData(event.currentTarget);
-    const supabase = createClient();
     const enteredNotes = String(formData.get("orderNotes") ?? "");
     const contextualNotes = orderType === "dine_in" && table
       ? `[[TRIMOS_TABLE:${table.code}]] ${enteredNotes}`.trim()
@@ -201,14 +199,20 @@ export function PublicCheckoutClient({ restaurant, settings, table }: Props) {
           ? Number(formData.get("cashTenderedAmount"))
           : null,
     };
-    const { data, error } = await supabase.rpc(
-      "create_public_order",
-      orderRequest as unknown as Database["public"]["Functions"]["create_public_order"]["Args"],
-    );
-    if (error || !data?.[0]) {
+    const orderResponse = await fetch("/api/public/orders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(orderRequest),
+    });
+    const data = (await orderResponse.json()) as {
+      order_id?: string;
+      order_token?: string;
+      error?: string;
+    };
+    if (!orderResponse.ok || !data.order_id || !data.order_token) {
       setSubmitting(false);
       toast.error("Não foi possível concluir o pedido.", {
-        description: error?.message,
+        description: data.error,
       });
       return;
     }
@@ -218,8 +222,8 @@ export function PublicCheckoutClient({ restaurant, settings, table }: Props) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          orderId: data[0].order_id,
-          token: data[0].order_token,
+          orderId: data.order_id,
+          token: data.order_token,
         }),
       });
       const payment = (await response.json()) as { url?: string; error?: string };
@@ -238,7 +242,7 @@ export function PublicCheckoutClient({ restaurant, settings, table }: Props) {
     setSubmitting(false);
     writeCart(restaurant.id, []);
     router.push(
-      `/r/${restaurant.slug}/pedido/${data[0].order_id}?token=${data[0].order_token}`,
+      `/r/${restaurant.slug}/pedido/${data.order_id}?token=${data.order_token}`,
     );
   }
 

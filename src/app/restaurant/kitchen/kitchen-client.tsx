@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
+import { updateRestaurantOrderStatusAction } from "@/features/orders/actions/order-actions";
 import type { Json } from "@/types/database";
 import type { Database } from "@/types/database";
 
@@ -186,18 +187,10 @@ function KitchenClient({
   }, [restaurantId, supabase]);
 
   async function updateStatus(orderId: string, status: OrderStatus) {
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        status,
-        ready_at: status === "ready" ? new Date().toISOString() : undefined,
-      })
-      .eq("id", orderId)
-      .eq("restaurant_id", restaurantId);
-
-    if (error) {
+    const result = await updateRestaurantOrderStatusAction(orderId, status);
+    if (!result.ok) {
       toast.error("Não foi possível atualizar o pedido", {
-        description: error.message,
+        description: result.message,
       });
       return;
     }

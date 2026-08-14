@@ -20,7 +20,7 @@ export default async function PublicOrderStatusPage({
       requested_order_id: orderId,
       requested_order_token: token,
     }),
-    supabase.from("restaurants").select("currency_code, is_demo").eq("slug", slug).eq("status", "active").maybeSingle(),
+    supabase.from("public_restaurants").select("currency_code, is_demo").eq("slug", slug).eq("status", "active").maybeSingle(),
   ]);
 
   if (error || !data || !restaurant) notFound();

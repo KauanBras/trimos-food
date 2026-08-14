@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getWritableCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
 import { getStripe } from "@/lib/stripe/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
@@ -45,9 +46,6 @@ export async function updateRestaurantOrderStatusAction(
       return { ok: false, message: "A entrega deve ser concluída pelo estafeta." };
     }
 
-    let paymentStatus = order.payment_status;
-    let refundedAt: string | null | undefined;
-
     if (status === "cancelled" && order.payment_method === "mb_way" && order.payment_status === "paid") {
       if (!order.provider_payment_id) throw new Error("A referência do pagamento não foi encontrada.");
       const { data: settings } = await supabase.from("restaurant_settings")
@@ -57,30 +55,38 @@ export async function updateRestaurantOrderStatusAction(
         { payment_intent: order.provider_payment_id, reason: "requested_by_customer" },
         { stripeAccount: settings.stripe_account_id, idempotencyKey: `refund-order-${order.id}` },
       );
-      paymentStatus = "refunded";
-      refundedAt = new Date().toISOString();
+      const now = new Date().toISOString();
+      const { error: updateError } = await createAdminClient()
+        .from("orders")
+        .update({
+          status: "cancelled",
+          payment_status: "refunded",
+          cancelled_at: now,
+          refunded_at: now,
+        })
+        .eq("id", orderId)
+        .eq("restaurant_id", restaurantId);
+      if (updateError) throw new Error(updateError.message);
+    } else {
+      const { data: transition, error: transitionError } = await supabase.rpc(
+        "transition_restaurant_order_status",
+        { requested_order_id: orderId, requested_status: status },
+      );
+      if (transitionError) throw new Error(transitionError.message);
+      const result = transition as { paymentStatus?: Database["public"]["Enums"]["payment_status"] } | null;
+      order.payment_status = result?.paymentStatus ?? order.payment_status;
     }
-
-    if (status === "completed" && order.payment_status === "awaiting_collection") {
-      paymentStatus = "paid";
-    }
-
-    const now = new Date().toISOString();
-    const { error: updateError } = await supabase.from("orders").update({
-      status,
-      payment_status: paymentStatus,
-      accepted_at: status === "confirmed" || status === "preparing" ? now : undefined,
-      ready_at: status === "ready" ? now : undefined,
-      completed_at: status === "completed" ? now : undefined,
-      cancelled_at: status === "cancelled" ? now : undefined,
-      paid_at: paymentStatus === "paid" ? now : undefined,
-      refunded_at: refundedAt,
-    }).eq("id", orderId).eq("restaurant_id", restaurantId);
-    if (updateError) throw new Error(updateError.message);
 
     revalidatePath("/restaurant/orders");
     revalidatePath("/restaurant/dashboard");
-    return { ok: true, message: "Pedido atualizado.", paymentStatus };
+    return {
+      ok: true,
+      message: "Pedido atualizado.",
+      paymentStatus:
+        status === "cancelled" && order.payment_method === "mb_way"
+          ? "refunded"
+          : order.payment_status,
+    };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : "Não foi possível atualizar o pedido." };
   }

@@ -50,7 +50,7 @@ export default async function PublicRestaurantPage({
     data: restaurant,
     error: restaurantError,
   } = await supabase
-    .from("restaurants")
+    .from("public_restaurants")
     .select(`
       id,
       name,

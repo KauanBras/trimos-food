@@ -10,19 +10,27 @@ export default async function PublicReservationPage({ params }: { params: Promis
   const { slug } = await params;
   const supabase = await createClient();
   const { data: restaurant } = await supabase
-    .from("restaurants")
-    .select("id, name, slug, accepts_reservations, status, is_demo, business_hours(day_of_week, opens_at, closes_at, is_closed)")
+    .from("public_restaurants")
+    .select("id, name, slug, accepts_reservations, status, is_demo")
     .eq("slug", slug)
     .eq("status", "active")
     .maybeSingle();
 
   if (!restaurant) notFound();
 
-  const { data: settings } = await supabase
-    .rpc("get_public_reservation_settings", {
-      requested_restaurant_id: restaurant.id,
-    })
-    .maybeSingle();
+  const [{ data: settings }, { data: businessHours }] = await Promise.all([
+    supabase
+      .rpc("get_public_reservation_settings", {
+        requested_restaurant_id: restaurant.id,
+      })
+      .maybeSingle(),
+    supabase
+      .from("business_hours")
+      .select("day_of_week, opens_at, closes_at, is_closed")
+      .eq("restaurant_id", restaurant.id)
+      .order("day_of_week")
+      .order("sort_order"),
+  ]);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-amber-50 via-zinc-50 to-zinc-50 px-4 py-8 sm:py-14">
@@ -42,7 +50,7 @@ export default async function PublicReservationPage({ params }: { params: Promis
             slug={restaurant.slug}
             slotMinutes={settings.reservation_slot_minutes}
             advanceDays={settings.reservation_advance_days}
-            businessHours={restaurant.business_hours ?? []}
+            businessHours={businessHours ?? []}
             initialNow={new Date().toISOString()}
             promotion={{
               enabled: settings.reservation_discount_enabled,

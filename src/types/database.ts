@@ -1924,7 +1924,31 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_restaurants: {
+        Row: {
+          accepts_delivery: boolean
+          accepts_dine_in: boolean
+          accepts_pickup: boolean
+          accepts_reservations: boolean
+          address_line: string | null
+          city: string | null
+          country_code: string
+          cover_url: string | null
+          currency_code: string
+          description: string | null
+          email: string | null
+          id: string
+          is_demo: boolean
+          logo_url: string | null
+          name: string
+          phone: string | null
+          postal_code: string | null
+          slug: string
+          status: Database["public"]["Enums"]["restaurant_status"]
+          timezone: string
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_delivery: {
@@ -1956,6 +1980,15 @@ export type Database = {
         Args: { requested_driver_id: string }
         Returns: boolean
       }
+      consume_public_rate_limit: {
+        Args: {
+          requested_action: string
+          requested_key_hash: string
+          requested_limit: number
+          requested_window_seconds: number
+        }
+        Returns: boolean
+      }
       cancel_public_reservation: {
         Args: {
           requested_reservation_id: string
@@ -1977,13 +2010,13 @@ export type Database = {
       }
       create_public_order: {
         Args: {
-          requested_cash_tendered_amount: number
+          requested_cash_tendered_amount: number | null
           requested_customer_email: string
           requested_customer_name: string
           requested_customer_phone: string
           requested_delivery_address: string
-          requested_delivery_latitude: number
-          requested_delivery_longitude: number
+          requested_delivery_latitude: number | null
+          requested_delivery_longitude: number | null
           requested_items: Json
           requested_notes: string
           requested_payment_method: Database["public"]["Enums"]["payment_method"]
@@ -2185,6 +2218,13 @@ export type Database = {
           requested_restaurant_id: string
         }
         Returns: number
+      }
+      transition_restaurant_order_status: {
+        Args: {
+          requested_order_id: string
+          requested_status: Database["public"]["Enums"]["order_status"]
+        }
+        Returns: Json
       }
       submit_commercial_lead: {
         Args: {

@@ -13,7 +13,7 @@ export default async function PublicProductPage({ params, searchParams }: Props)
   const { table } = await searchParams;
   const tableCode = table?.trim().toUpperCase().slice(0, 40);
   const supabase = await createClient();
-  const { data: restaurant } = await supabase.from("restaurants").select("id, slug, currency_code, is_demo").eq("slug", slug).eq("status", "active").maybeSingle();
+  const { data: restaurant } = await supabase.from("public_restaurants").select("id, slug, currency_code, is_demo").eq("slug", slug).eq("status", "active").maybeSingle();
   if (!restaurant) notFound();
   const [{ data: product }, { data: variants }, { data: links }] = await Promise.all([
     supabase.from("products").select("id, name, description, image_url, price, regular_price, promotion_enabled, promotion_label, categories(is_active)").eq("id", productId).eq("restaurant_id", restaurant.id).eq("is_active", true).eq("is_available", true).maybeSingle(),
