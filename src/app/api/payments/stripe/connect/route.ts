@@ -5,6 +5,7 @@ import {
   getSiteUrl,
   getStripe,
   isStripeAccountAccessError,
+  isStripePlatformActivationError,
 } from "@/lib/stripe/server";
 import { getSelectedRestaurantId } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
@@ -139,6 +140,16 @@ export async function POST() {
     });
     return NextResponse.json({ url: link.url });
   } catch (error) {
+    if (isStripePlatformActivationError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            "A conta principal da Trimos precisa concluir a ativação do Stripe Connect antes de ligar restaurantes.",
+          setupUrl: "https://dashboard.stripe.com/account/onboarding",
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ error: error instanceof Error ? error.message : "Não foi possível ligar a Stripe." }, { status: 500 });
   }
 }

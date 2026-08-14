@@ -275,7 +275,23 @@ export function RestaurantSettingsForm({
     setConnectingStripe(true);
     try {
       const response = await fetch("/api/payments/stripe/connect", { method: "POST" });
-      const result = (await response.json()) as { url?: string; error?: string };
+      const result = (await response.json()) as {
+        url?: string;
+        error?: string;
+        setupUrl?: string;
+      };
+      if (!response.ok && result.setupUrl) {
+        setConnectingStripe(false);
+        const setupUrl = result.setupUrl;
+        toast.error("Ativação do Stripe Connect necessária", {
+          description: result.error,
+          action: {
+            label: "Abrir Stripe",
+            onClick: () => window.location.assign(setupUrl),
+          },
+        });
+        return;
+      }
       if (!response.ok || !result.url) throw new Error(result.error ?? "Não foi possível iniciar a ligação.");
       window.location.assign(result.url);
     } catch (error) {

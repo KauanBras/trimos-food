@@ -48,6 +48,16 @@ export function isStripeAccountAccessError(error: unknown) {
   );
 }
 
+export function isStripePlatformActivationError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("account must be activated in order to create accounts") ||
+    message.includes("activate your accounts at")
+  );
+}
+
 export async function getConnectedAccountState(accountId: string) {
   const stripe = getStripe();
   const account = await stripe.v2.core.accounts.retrieve(accountId, {
