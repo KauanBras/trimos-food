@@ -1,6 +1,5 @@
--- Force order changes through a narrow transition function. Browser clients
--- can no longer alter totals, customer data or payment identifiers directly.
-
+-- Fix the already-deployed transition function: CURRENT_TIME is a PostgreSQL
+-- keyword and was resolved as timetz instead of the local timestamptz variable.
 create or replace function public.transition_restaurant_order_status(
   requested_order_id uuid,
   requested_status public.order_status
