@@ -1,6 +1,9 @@
 import { RestaurantSettingsForm } from "@/features/restaurants/components/restaurant-settings-form";
 import { getCurrentRestaurant } from "@/lib/restaurants/get-current-restaurant";
-import { getConnectedAccountState } from "@/lib/stripe/server";
+import {
+  getConnectedAccountState,
+  isStripeAccountAccessError,
+} from "@/lib/stripe/server";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function RestaurantSettingsPage() {
@@ -64,7 +67,24 @@ export default async function RestaurantSettingsPage() {
       } else {
         currentSettings = { ...currentSettings, ...stripeUpdates };
       }
-    } catch {
+    } catch (error) {
+      if (isStripeAccountAccessError(error)) {
+        const stripeUpdates = {
+          accepts_mb_way: false,
+          stripe_account_id: null,
+          stripe_charges_enabled: false,
+          stripe_payouts_enabled: false,
+          stripe_details_submitted: false,
+          stripe_mb_way_enabled: false,
+        };
+        const { error: stripeResetError } = await supabase
+          .from("restaurant_settings")
+          .update({ ...stripeUpdates, stripe_connected_at: null })
+          .eq("restaurant_id", restaurantId);
+        if (!stripeResetError) {
+          currentSettings = { ...currentSettings, ...stripeUpdates };
+        }
+      }
       // A página continua disponível se a Stripe estiver temporariamente indisponível.
     }
   }

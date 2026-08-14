@@ -30,6 +30,24 @@ export function getSiteUrl() {
   );
 }
 
+export function isStripeAccountAccessError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+
+  const stripeError = error as Error & {
+    code?: string;
+    statusCode?: number;
+    type?: string;
+  };
+  const message = stripeError.message.toLowerCase();
+
+  return (
+    stripeError.statusCode === 403 ||
+    stripeError.code === "account_invalid" ||
+    message.includes("does not have access to account") ||
+    message.includes("application access may have been revoked")
+  );
+}
+
 export async function getConnectedAccountState(accountId: string) {
   const stripe = getStripe();
   const account = await stripe.v2.core.accounts.retrieve(accountId, {

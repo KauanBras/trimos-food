@@ -4,6 +4,7 @@ import {
   getConnectedAccountState,
   getSiteUrl,
   getStripe,
+  isStripeAccountAccessError,
 } from "@/lib/stripe/server";
 import { getSelectedRestaurantId } from "@/lib/restaurants/get-current-restaurant";
 import { createClient } from "@/lib/supabase/server";
@@ -38,6 +39,29 @@ export async function POST() {
 
     const stripe = getStripe();
     let accountId = settings.stripe_account_id;
+    if (accountId) {
+      try {
+        await getConnectedAccountState(accountId);
+      } catch (error) {
+        if (!isStripeAccountAccessError(error)) throw error;
+
+        const { error: resetError } = await supabase
+          .from("restaurant_settings")
+          .update({
+            accepts_mb_way: false,
+            stripe_account_id: null,
+            stripe_charges_enabled: false,
+            stripe_payouts_enabled: false,
+            stripe_details_submitted: false,
+            stripe_mb_way_enabled: false,
+            stripe_connected_at: null,
+          })
+          .eq("restaurant_id", membership.restaurant_id);
+        if (resetError) throw new Error(resetError.message);
+        accountId = null;
+      }
+    }
+
     if (!accountId) {
       const contactEmail = restaurant.email ?? user.email;
       if (!contactEmail) {

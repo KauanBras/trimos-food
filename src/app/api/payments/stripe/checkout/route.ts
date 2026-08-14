@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { getSiteUrl, getStripe } from "@/lib/stripe/server";
+import {
+  getSiteUrl,
+  getStripe,
+  isStripeAccountAccessError,
+} from "@/lib/stripe/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/types/database";
 
@@ -45,30 +49,56 @@ export async function POST(request: Request) {
 
     const siteUrl = getSiteUrl();
     const orderUrl = `${siteUrl}/r/${order.restaurantSlug}/pedido/${order.orderId}?token=${body.token}`;
-    const session = await getStripe().checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["mb_way"],
-      line_items: [{
-        price_data: {
-          currency: "eur",
-          unit_amount: Math.round(Number(order.total) * 100),
-          product_data: {
-            name: `Pedido ${order.restaurantName}`,
-            description: `Pedido #${order.orderId.slice(0, 6).toUpperCase()}`,
+    let session;
+    try {
+      session = await getStripe().checkout.sessions.create({
+        mode: "payment",
+        payment_method_types: ["mb_way"],
+        line_items: [{
+          price_data: {
+            currency: "eur",
+            unit_amount: Math.round(Number(order.total) * 100),
+            product_data: {
+              name: `Pedido ${order.restaurantName}`,
+              description: `Pedido #${order.orderId.slice(0, 6).toUpperCase()}`,
+            },
           },
+          quantity: 1,
+        }],
+        client_reference_id: order.orderId,
+        metadata: { order_id: order.orderId, restaurant_id: order.restaurantId },
+        payment_intent_data: { metadata: { order_id: order.orderId, restaurant_id: order.restaurantId } },
+        success_url: `${orderUrl}&payment=success`,
+        cancel_url: `${orderUrl}&payment=cancelled`,
+        expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
+      }, {
+        stripeAccount: order.stripeAccountId,
+        idempotencyKey: `trimos-mbway-${order.orderId}-${order.paymentAttempts}`,
+      });
+    } catch (error) {
+      if (!isStripeAccountAccessError(error)) throw error;
+
+      await supabase
+        .from("restaurant_settings")
+        .update({
+          accepts_mb_way: false,
+          stripe_account_id: null,
+          stripe_charges_enabled: false,
+          stripe_payouts_enabled: false,
+          stripe_details_submitted: false,
+          stripe_mb_way_enabled: false,
+          stripe_connected_at: null,
+        })
+        .eq("restaurant_id", order.restaurantId);
+
+      return NextResponse.json(
+        {
+          error:
+            "A ligação deste restaurante à Stripe expirou. O proprietário precisa ligá-la novamente nas Configurações.",
         },
-        quantity: 1,
-      }],
-      client_reference_id: order.orderId,
-      metadata: { order_id: order.orderId, restaurant_id: order.restaurantId },
-      payment_intent_data: { metadata: { order_id: order.orderId, restaurant_id: order.restaurantId } },
-      success_url: `${orderUrl}&payment=success`,
-      cancel_url: `${orderUrl}&payment=cancelled`,
-      expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
-    }, {
-      stripeAccount: order.stripeAccountId,
-      idempotencyKey: `trimos-mbway-${order.orderId}-${order.paymentAttempts}`,
-    });
+        { status: 409 },
+      );
+    }
     if (!session.url) throw new Error("A Stripe não devolveu o endereço de pagamento.");
 
     const { data: attached, error: attachError } = await supabase.rpc("attach_stripe_checkout_session", {
