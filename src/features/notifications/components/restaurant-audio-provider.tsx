@@ -10,6 +10,7 @@ import {
   stopNotificationAlarm,
   unlockNotificationAudio,
   isNotificationAudioReady,
+  restoreNotificationAudio,
 } from "@/lib/audio/notification-alarm";
 import { createClient } from "@/lib/supabase/client";
 
@@ -18,6 +19,8 @@ type RestaurantAudioProviderProps = {
   initialNewOrders: number;
   enabled?: boolean;
 };
+
+const AUDIO_PREFERENCE_KEY = "trimos-restaurant-audio-unlocked";
 
 export function RestaurantAudioProvider({
   restaurantId,
@@ -73,7 +76,7 @@ export function RestaurantAudioProvider({
     syncAlarm(count ?? 0);
   }, [enabled, restaurantId, supabase, syncAlarm]);
 
-  const unlockAudio = useCallback(async () => {
+  const unlockAudio = useCallback(async (requestNotifications = true) => {
     try {
       setAudioError(null);
       const ready = await unlockNotificationAudio();
@@ -82,9 +85,14 @@ export function RestaurantAudioProvider({
       audioUnlockedRef.current = true;
       setAudioEnabled(true);
 
-      window.sessionStorage.setItem("trimos-restaurant-audio-unlocked", "true");
+      window.localStorage.setItem(AUDIO_PREFERENCE_KEY, "true");
+      window.sessionStorage.setItem(AUDIO_PREFERENCE_KEY, "true");
 
-      if ("Notification" in window && Notification.permission === "default") {
+      if (
+        requestNotifications &&
+        "Notification" in window &&
+        Notification.permission === "default"
+      ) {
         try {
           await Notification.requestPermission();
         } catch (notificationError) {
@@ -103,6 +111,63 @@ export function RestaurantAudioProvider({
     }
   }, []);
 
+  const restoreAudio = useCallback(async () => {
+    const ready = await restoreNotificationAudio();
+
+    if (!ready) {
+      return false;
+    }
+
+    audioUnlockedRef.current = true;
+    setAudioEnabled(true);
+    setAudioError(null);
+
+    if (newOrdersCountRef.current > 0) {
+      startNotificationAlarm("restaurant");
+    }
+
+    return true;
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const audioWasEnabled =
+      window.localStorage.getItem(AUDIO_PREFERENCE_KEY) === "true" ||
+      window.sessionStorage.getItem(AUDIO_PREFERENCE_KEY) === "true";
+
+    const restoreTimer = audioWasEnabled
+      ? window.setTimeout(() => void restoreAudio(), 0)
+      : null;
+
+    const handleInteraction = () => {
+      if (audioUnlockedRef.current && isNotificationAudioReady()) {
+        return;
+      }
+
+      void unlockAudio(false);
+    };
+
+    window.addEventListener("pointerdown", handleInteraction, {
+      passive: true,
+      capture: true,
+    });
+    window.addEventListener("keydown", handleInteraction, { capture: true });
+    window.addEventListener("touchstart", handleInteraction, {
+      passive: true,
+      capture: true,
+    });
+
+    return () => {
+      if (restoreTimer !== null) window.clearTimeout(restoreTimer);
+      window.removeEventListener("pointerdown", handleInteraction, true);
+      window.removeEventListener("keydown", handleInteraction, true);
+      window.removeEventListener("touchstart", handleInteraction, true);
+    };
+  }, [enabled, restoreAudio, unlockAudio]);
+
   useEffect(() => {
     if (!enabled) {
       stopNotificationAlarm();
@@ -111,19 +176,13 @@ export function RestaurantAudioProvider({
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        if (!isNotificationAudioReady()) {
-          audioUnlockedRef.current = false;
-          setAudioEnabled(false);
-        }
+        if (!isNotificationAudioReady()) void restoreAudio();
         void fetchNewOrdersCount();
       }
     };
 
     const handleFocus = () => {
-      if (!isNotificationAudioReady()) {
-        audioUnlockedRef.current = false;
-        setAudioEnabled(false);
-      }
+      if (!isNotificationAudioReady()) void restoreAudio();
       void fetchNewOrdersCount();
     };
 
@@ -134,7 +193,7 @@ export function RestaurantAudioProvider({
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [enabled, fetchNewOrdersCount]);
+  }, [enabled, fetchNewOrdersCount, restoreAudio]);
 
   useEffect(() => {
     if (!enabled) {
@@ -240,7 +299,7 @@ export function RestaurantAudioProvider({
         <Button
           type="button"
           className="shrink-0 bg-amber-500 text-zinc-950 hover:bg-amber-400"
-          onClick={() => void unlockAudio()}
+          onClick={() => void unlockAudio(true)}
         >
           Ativar e testar
         </Button>

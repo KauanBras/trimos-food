@@ -100,9 +100,9 @@ function playTone(
 }
 
 function playRestaurantPattern(trackForAlarm = false) {
-  playTone(440, 0.5, 0, 0.1, "sine", trackForAlarm);
-  playTone(554.37, 0.56, 0.62, 0.09, "sine", trackForAlarm);
-  playTone(659.25, 0.68, 1.28, 0.08, "sine", trackForAlarm);
+  playTone(440, 0.5, 0, 0.22, "sine", trackForAlarm);
+  playTone(554.37, 0.56, 0.62, 0.2, "sine", trackForAlarm);
+  playTone(659.25, 0.68, 1.28, 0.18, "sine", trackForAlarm);
 }
 
 function playDriverPattern(trackForAlarm = false) {
@@ -128,19 +128,20 @@ export function unlockNotificationAudio() {
   return unlockInFlight;
 }
 
+export async function restoreNotificationAudio() {
+  try {
+    const context = await ensureAudioReady();
+    return context.state === "running";
+  } catch {
+    return false;
+  }
+}
+
 export function isNotificationAudioReady() {
   return getAudioContext()?.state === "running";
 }
 
 export function startNotificationAlarm(type: AlarmType) {
-  if (currentAlarm === type && alarmInterval) {
-    return;
-  }
-
-  stopNotificationAlarm();
-
-  currentAlarm = type;
-
   const playPattern =
     type === "restaurant" ? playRestaurantPattern : playDriverPattern;
 
@@ -156,6 +157,15 @@ export function startNotificationAlarm(type: AlarmType) {
       console.warn("Não foi possível tocar o alarme:", error);
     }
   };
+
+  if (currentAlarm === type && alarmInterval) {
+    void playWhenReady();
+    return;
+  }
+
+  stopNotificationAlarm();
+
+  currentAlarm = type;
 
   void playWhenReady();
 
