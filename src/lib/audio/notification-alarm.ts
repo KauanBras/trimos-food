@@ -1,10 +1,48 @@
 type AlarmType = "restaurant" | "driver";
 
 let audioContext: AudioContext | null = null;
+let restaurantAudio: HTMLAudioElement | null = null;
+let restaurantAudioUnlocked = false;
 let alarmInterval: ReturnType<typeof setInterval> | null = null;
 let currentAlarm: AlarmType | null = null;
 let unlockInFlight: Promise<boolean> | null = null;
 const activeAlarmOscillators = new Set<OscillatorNode>();
+
+function getRestaurantAudio() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  if (!restaurantAudio) {
+    restaurantAudio = new Audio("/sounds/new-order.ogg");
+    restaurantAudio.preload = "auto";
+    restaurantAudio.volume = 0.55;
+  }
+
+  return restaurantAudio;
+}
+
+async function playRestaurantAudio(requiresUnlock = true) {
+  const audio = getRestaurantAudio();
+
+  if (!audio || (requiresUnlock && !restaurantAudioUnlocked)) {
+    return false;
+  }
+
+  if (!audio.paused) {
+    return true;
+  }
+
+  try {
+    audio.currentTime = 0;
+    await audio.play();
+    restaurantAudioUnlocked = true;
+    return true;
+  } catch (error) {
+    console.warn("O ficheiro do alerta não pôde ser reproduzido:", error);
+    return false;
+  }
+}
 
 function getAudioContext() {
   if (typeof window === "undefined") {
@@ -112,10 +150,27 @@ function playDriverPattern(trackForAlarm = false) {
 }
 
 async function performAudioUnlock() {
-  const context = await ensureAudioReady();
-  playRestaurantPattern();
+  // Inicie ambas as tentativas ainda dentro do gesto do utilizador. O Safari
+  // pode perder a autorização se audio.play() for chamado apenas após um await.
+  const mediaAttempt = playRestaurantAudio(false);
+  const contextAttempt = ensureAudioReady()
+    .then((context) => context.state === "running")
+    .catch(() => false);
 
-  return context.state === "running";
+  const [mediaReady, contextReady] = await Promise.all([
+    mediaAttempt,
+    contextAttempt,
+  ]);
+
+  if (!mediaReady && contextReady) {
+    playRestaurantPattern();
+  }
+
+  if (!mediaReady && !contextReady) {
+    throw new Error("O navegador manteve o áudio suspenso.");
+  }
+
+  return true;
 }
 
 export function unlockNotificationAudio() {
@@ -129,6 +184,10 @@ export function unlockNotificationAudio() {
 }
 
 export async function restoreNotificationAudio() {
+  if (restaurantAudioUnlocked) {
+    return true;
+  }
+
   try {
     const context = await ensureAudioReady();
     return context.state === "running";
@@ -138,7 +197,9 @@ export async function restoreNotificationAudio() {
 }
 
 export function isNotificationAudioReady() {
-  return getAudioContext()?.state === "running";
+  return (
+    restaurantAudioUnlocked || getAudioContext()?.state === "running"
+  );
 }
 
 export function startNotificationAlarm(type: AlarmType) {
@@ -146,6 +207,10 @@ export function startNotificationAlarm(type: AlarmType) {
     type === "restaurant" ? playRestaurantPattern : playDriverPattern;
 
   const playWhenReady = async () => {
+    if (type === "restaurant" && (await playRestaurantAudio())) {
+      return;
+    }
+
     try {
       await ensureAudioReady();
       if (type === "restaurant") {
@@ -184,6 +249,11 @@ export function stopNotificationAlarm() {
 
   alarmInterval = null;
   currentAlarm = null;
+
+  if (restaurantAudio) {
+    restaurantAudio.pause();
+    restaurantAudio.currentTime = 0;
+  }
 
   for (const oscillator of activeAlarmOscillators) {
     try {

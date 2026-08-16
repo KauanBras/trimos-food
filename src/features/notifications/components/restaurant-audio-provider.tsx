@@ -33,6 +33,7 @@ export function RestaurantAudioProvider({
   const audioUnlockedRef = useRef(false);
   const newOrdersCountRef = useRef(initialNewOrders);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioActivating, setAudioActivating] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
 
   const syncAlarm = useCallback((count: number) => {
@@ -78,6 +79,7 @@ export function RestaurantAudioProvider({
 
   const unlockAudio = useCallback(async (requestNotifications = true) => {
     try {
+      setAudioActivating(true);
       setAudioError(null);
       const ready = await unlockNotificationAudio();
       if (!ready) throw new Error("O navegador manteve o áudio suspenso.");
@@ -108,6 +110,8 @@ export function RestaurantAudioProvider({
       setAudioError(
         "O Safari não liberou o som. Toque novamente em Ativar som.",
       );
+    } finally {
+      setAudioActivating(false);
     }
   }, []);
 
@@ -142,31 +146,10 @@ export function RestaurantAudioProvider({
       ? window.setTimeout(() => void restoreAudio(), 0)
       : null;
 
-    const handleInteraction = () => {
-      if (audioUnlockedRef.current && isNotificationAudioReady()) {
-        return;
-      }
-
-      void unlockAudio(false);
-    };
-
-    window.addEventListener("pointerdown", handleInteraction, {
-      passive: true,
-      capture: true,
-    });
-    window.addEventListener("keydown", handleInteraction, { capture: true });
-    window.addEventListener("touchstart", handleInteraction, {
-      passive: true,
-      capture: true,
-    });
-
     return () => {
       if (restoreTimer !== null) window.clearTimeout(restoreTimer);
-      window.removeEventListener("pointerdown", handleInteraction, true);
-      window.removeEventListener("keydown", handleInteraction, true);
-      window.removeEventListener("touchstart", handleInteraction, true);
     };
-  }, [enabled, restoreAudio, unlockAudio]);
+  }, [enabled, restoreAudio]);
 
   useEffect(() => {
     if (!enabled) {
@@ -275,33 +258,64 @@ export function RestaurantAudioProvider({
     return null;
   }
 
-  if (audioEnabled) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-xl">
-      <div className="flex items-center gap-3">
-        <div className="rounded-xl bg-amber-100 p-2 text-amber-700">
+    <div
+      className={`fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-2xl border p-4 shadow-xl ${
+        audioEnabled
+          ? "border-emerald-200 bg-emerald-50"
+          : "border-amber-200 bg-amber-50"
+      }`}
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div
+          className={`rounded-xl p-2 ${
+            audioEnabled
+              ? "bg-emerald-100 text-emerald-700"
+              : "bg-amber-100 text-amber-700"
+          }`}
+        >
           <BellRing className="size-5" />
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-amber-950">
-            Ativar e testar som dos pedidos
+          <p
+            className={`font-semibold ${
+              audioEnabled ? "text-emerald-950" : "text-amber-950"
+            }`}
+          >
+            {audioEnabled
+              ? "Som dos pedidos ativo"
+              : "Ativar e testar som dos pedidos"}
           </p>
-          <p className="text-sm text-amber-800">
+          <p
+            className={`text-sm ${
+              audioEnabled ? "text-emerald-800" : "text-amber-800"
+            }`}
+          >
             {audioError ??
-              "Necessário para o alarme tocar até o pedido ser aceite."}
+              (audioEnabled
+                ? "O alarme tocará até o pedido ser aceite ou rejeitado."
+                : "Toque no botão para o navegador autorizar o alarme.")}
           </p>
         </div>
 
         <Button
           type="button"
-          className="shrink-0 bg-amber-500 text-zinc-950 hover:bg-amber-400"
+          className={`w-full shrink-0 text-zinc-950 sm:w-auto ${
+            audioEnabled
+              ? "bg-emerald-500 hover:bg-emerald-400"
+              : "bg-amber-500 hover:bg-amber-400"
+          }`}
           onClick={() => void unlockAudio(true)}
+          disabled={audioActivating}
         >
-          Ativar e testar
+          {audioActivating
+            ? "A testar..."
+            : audioEnabled
+              ? "Testar novamente"
+              : "Ativar e testar"}
         </Button>
       </div>
     </div>
