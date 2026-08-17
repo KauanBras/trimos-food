@@ -1,48 +1,11 @@
 type AlarmType = "restaurant" | "driver";
 
 let audioContext: AudioContext | null = null;
-let restaurantAudio: HTMLAudioElement | null = null;
 let restaurantAudioUnlocked = false;
 let alarmInterval: ReturnType<typeof setInterval> | null = null;
 let currentAlarm: AlarmType | null = null;
 let unlockInFlight: Promise<boolean> | null = null;
 const activeAlarmOscillators = new Set<OscillatorNode>();
-
-function getRestaurantAudio() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  if (!restaurantAudio) {
-    restaurantAudio = new Audio("/sounds/new-order.ogg");
-    restaurantAudio.preload = "auto";
-    restaurantAudio.volume = 0.55;
-  }
-
-  return restaurantAudio;
-}
-
-async function playRestaurantAudio(requiresUnlock = true) {
-  const audio = getRestaurantAudio();
-
-  if (!audio || (requiresUnlock && !restaurantAudioUnlocked)) {
-    return false;
-  }
-
-  if (!audio.paused) {
-    return true;
-  }
-
-  try {
-    audio.currentTime = 0;
-    await audio.play();
-    restaurantAudioUnlocked = true;
-    return true;
-  } catch (error) {
-    console.warn("O ficheiro do alerta não pôde ser reproduzido:", error);
-    return false;
-  }
-}
 
 function getAudioContext() {
   if (typeof window === "undefined") {
@@ -138,9 +101,10 @@ function playTone(
 }
 
 function playRestaurantPattern(trackForAlarm = false) {
-  playTone(440, 0.5, 0, 0.22, "sine", trackForAlarm);
-  playTone(554.37, 0.56, 0.62, 0.2, "sine", trackForAlarm);
-  playTone(659.25, 0.68, 1.28, 0.18, "sine", trackForAlarm);
+  // Campainha curta e suave, gerada pelo próprio navegador para funcionar
+  // de forma consistente no Safari, Chrome e telemóveis.
+  playTone(523.25, 0.32, 0, 0.18, "sine", trackForAlarm);
+  playTone(659.25, 0.48, 0.38, 0.16, "sine", trackForAlarm);
 }
 
 function playDriverPattern(trackForAlarm = false) {
@@ -150,26 +114,14 @@ function playDriverPattern(trackForAlarm = false) {
 }
 
 async function performAudioUnlock() {
-  // Inicie ambas as tentativas ainda dentro do gesto do utilizador. O Safari
-  // pode perder a autorização se audio.play() for chamado apenas após um await.
-  const mediaAttempt = playRestaurantAudio(false);
-  const contextAttempt = ensureAudioReady()
-    .then((context) => context.state === "running")
-    .catch(() => false);
-
-  const [mediaReady, contextReady] = await Promise.all([
-    mediaAttempt,
-    contextAttempt,
-  ]);
-
-  if (!mediaReady && contextReady) {
-    playRestaurantPattern();
-  }
-
-  if (!mediaReady && !contextReady) {
+  // A chamada começa diretamente no gesto do utilizador. Isto é necessário
+  // para o Safari autorizar o AudioContext sem depender de um botão próprio.
+  const context = await ensureAudioReady();
+  if (context.state !== "running") {
     throw new Error("O navegador manteve o áudio suspenso.");
   }
-
+  restaurantAudioUnlocked = true;
+  playRestaurantPattern();
   return true;
 }
 
@@ -190,16 +142,15 @@ export async function restoreNotificationAudio() {
 
   try {
     const context = await ensureAudioReady();
-    return context.state === "running";
+    restaurantAudioUnlocked = context.state === "running";
+    return restaurantAudioUnlocked;
   } catch {
     return false;
   }
 }
 
 export function isNotificationAudioReady() {
-  return (
-    restaurantAudioUnlocked || getAudioContext()?.state === "running"
-  );
+  return restaurantAudioUnlocked && getAudioContext()?.state === "running";
 }
 
 export function startNotificationAlarm(type: AlarmType) {
@@ -207,10 +158,6 @@ export function startNotificationAlarm(type: AlarmType) {
     type === "restaurant" ? playRestaurantPattern : playDriverPattern;
 
   const playWhenReady = async () => {
-    if (type === "restaurant" && (await playRestaurantAudio())) {
-      return;
-    }
-
     try {
       await ensureAudioReady();
       if (type === "restaurant") {
@@ -224,7 +171,6 @@ export function startNotificationAlarm(type: AlarmType) {
   };
 
   if (currentAlarm === type && alarmInterval) {
-    void playWhenReady();
     return;
   }
 
@@ -238,7 +184,7 @@ export function startNotificationAlarm(type: AlarmType) {
     () => {
       void playWhenReady();
     },
-    type === "restaurant" ? 6500 : 2800,
+    type === "restaurant" ? 4500 : 2800,
   );
 }
 
@@ -249,11 +195,6 @@ export function stopNotificationAlarm() {
 
   alarmInterval = null;
   currentAlarm = null;
-
-  if (restaurantAudio) {
-    restaurantAudio.pause();
-    restaurantAudio.currentTime = 0;
-  }
 
   for (const oscillator of activeAlarmOscillators) {
     try {
