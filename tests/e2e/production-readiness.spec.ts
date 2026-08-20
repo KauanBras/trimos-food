@@ -46,7 +46,7 @@ test("robots protege áreas privadas e publica o sitemap", async ({
 
 test("vitrine comercial apresenta produto, preços e contacto", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
@@ -61,15 +61,19 @@ test("vitrine comercial apresenta produto, preços e contacto", async ({
   const homeDemoLink = page.getByRole("link", {
     name: "Ver exemplo real",
   });
-  await expect(homeDemoLink).toHaveAttribute(
-    "href",
-    "/r/hirotatsu-sushi-demo",
-  );
-  const homeDemoResponse = await page.goto("/r/hirotatsu-sushi-demo");
-  expect(homeDemoResponse?.ok()).toBeTruthy();
+  await expect(homeDemoLink).toHaveAttribute("href", "/r/hirotatsu-sushi-demo");
+  if (testInfo.project.name === "mobile-safari") {
+    await homeDemoLink.tap();
+  } else {
+    await homeDemoLink.click();
+  }
   await expect(page).toHaveURL(/\/r\/hirotatsu-sushi-demo$/, {
     timeout: 15_000,
   });
+  await expect(page.getByText("Demonstração Trimos Food")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Hirotatsu Sushi — Demonstração" }),
+  ).toBeVisible();
 
   await page.goto("/pricing");
   await expect(
@@ -78,9 +82,7 @@ test("vitrine comercial apresenta produto, preços e contacto", async ({
   await expect(
     page.getByText("Demonstração gratuita, sem instalação"),
   ).toBeVisible();
-  await expect(
-    page.getByText(/de configuração inicial/).first(),
-  ).toBeVisible();
+  await expect(page.getByText(/de configuração inicial/).first()).toBeVisible();
   const pricingDemoLink = page
     .getByRole("link", { name: "Ver demonstração", exact: true })
     .first();
@@ -88,11 +90,15 @@ test("vitrine comercial apresenta produto, preços e contacto", async ({
     "href",
     "/r/hirotatsu-sushi-demo",
   );
-  const pricingDemoResponse = await page.goto("/r/hirotatsu-sushi-demo");
-  expect(pricingDemoResponse?.ok()).toBeTruthy();
+  if (testInfo.project.name === "mobile-safari") {
+    await pricingDemoLink.tap();
+  } else {
+    await pricingDemoLink.click();
+  }
   await expect(page).toHaveURL(/\/r\/hirotatsu-sushi-demo$/, {
     timeout: 15_000,
   });
+  await expect(page.getByText("Demonstração Trimos Food")).toBeVisible();
 
   await page.goto("/contact");
   await expect(

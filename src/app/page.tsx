@@ -14,6 +14,7 @@ import {
 
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
+import { PublicDemoLink } from "@/components/marketing/public-demo-link";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,8 +101,8 @@ export default async function HomePage() {
                 >
                   Pedir demonstração <ArrowRight className="size-4" />
                 </Button>
-                <Link
-                  href="/r/hirotatsu-sushi-demo"
+                <PublicDemoLink
+                  data-testid="real-demo-link"
                   className={buttonVariants({
                     size: "lg",
                     variant: "outline",
@@ -110,7 +111,7 @@ export default async function HomePage() {
                   })}
                 >
                   Ver exemplo real
-                </Link>
+                </PublicDemoLink>
               </div>
               <p className="mt-4 text-xs text-zinc-500">
                 Veja o sistema sem instalação. A configuração começa somente
@@ -256,7 +257,8 @@ export default async function HomePage() {
                         </span>
                       </p>
                       <p className="mt-2 text-sm font-medium text-amber-700">
-                        + {formatMoneyFromCents(
+                        +{" "}
+                        {formatMoneyFromCents(
                           plan.setup_fee_cents,
                           plan.currency_code,
                         )}{" "}
@@ -298,8 +300,8 @@ export default async function HomePage() {
               Pronto para transformar a operação do seu restaurante?
             </h2>
             <p className="mt-4 max-w-2xl leading-7 text-amber-950/70">
-              Veja primeiro a demonstração. Só configuramos o restaurante
-              depois da aprovação comercial.
+              Veja primeiro a demonstração. Só configuramos o restaurante depois
+              da aprovação comercial.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Button

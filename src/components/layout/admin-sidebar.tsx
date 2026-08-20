@@ -9,27 +9,60 @@ import {
   Handshake,
   LayoutDashboard,
   LogOut,
+  Menu,
+  PlusCircle,
   Store,
   UtensilsCrossed,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { logoutAction } from "@/features/auth/actions/auth-actions";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { label: "Visão geral", href: "/admin", icon: LayoutDashboard },
-  { label: "Restaurantes", href: "/admin/restaurants", icon: Store },
+  {
+    label: "Restaurantes",
+    href: "/admin/restaurants",
+    icon: Store,
+    exact: true,
+  },
+  {
+    label: "Cadastrar restaurante",
+    href: "/admin/restaurants/new",
+    icon: PlusCircle,
+  },
   { label: "Oportunidades", href: "/admin/leads", icon: Handshake },
   { label: "Planos", href: "/admin/plans", icon: CreditCard },
   { label: "Auditoria", href: "/admin/audit", icon: ClipboardList },
   { label: "Estado do sistema", href: "/admin/health", icon: Activity },
 ];
 
-export function AdminSidebar({ userName }: { userName: string }) {
+export function AdminSidebar({
+  userName,
+  mobile = false,
+}: {
+  userName: string;
+  mobile?: boolean;
+}) {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden min-h-screen w-[268px] shrink-0 flex-col border-r border-zinc-800 bg-zinc-950 text-white lg:flex">
+    <aside
+      className={cn(
+        "w-[268px] shrink-0 flex-col border-r border-zinc-800 bg-zinc-950 text-white",
+        mobile
+          ? "flex h-dvh w-full overflow-y-auto"
+          : "hidden min-h-screen lg:flex",
+      )}
+    >
       <div className="border-b border-white/10 p-6">
         <Link href="/admin" className="flex items-center gap-3">
           <div className="flex size-11 items-center justify-center rounded-2xl bg-amber-400 text-zinc-950">
@@ -47,7 +80,9 @@ export function AdminSidebar({ userName }: { userName: string }) {
           const Icon = item.icon;
           const active =
             pathname === item.href ||
-            (item.href !== "/admin" && pathname.startsWith(item.href));
+            (!item.exact &&
+              item.href !== "/admin" &&
+              pathname.startsWith(`${item.href}/`));
 
           return (
             <Link
@@ -95,5 +130,44 @@ export function AdminSidebar({ userName }: { userName: string }) {
         </div>
       </div>
     </aside>
+  );
+}
+
+export function AdminMobileHeader({ userName }: { userName: string }) {
+  return (
+    <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-zinc-200 bg-white/95 px-4 backdrop-blur lg:hidden">
+      <Sheet>
+        <SheetTrigger
+          className="inline-flex size-10 items-center justify-center rounded-xl border border-zinc-200 bg-white"
+          aria-label="Abrir navegação da administração"
+        >
+          <Menu className="size-5" />
+        </SheetTrigger>
+        <SheetContent
+          side="left"
+          className="h-dvh w-[290px] overflow-hidden p-0"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>Navegação da administração</SheetTitle>
+          </SheetHeader>
+          <AdminSidebar userName={userName} mobile />
+        </SheetContent>
+      </Sheet>
+
+      <Link href="/admin" className="font-semibold">
+        Administração Trimos
+      </Link>
+
+      <Button
+        render={<Link href="/admin/restaurants/new" />}
+        nativeButton={false}
+        size="sm"
+        className="ml-auto gap-1.5"
+      >
+        <PlusCircle className="size-4" />
+        <span className="hidden min-[390px]:inline">Novo restaurante</span>
+        <span className="min-[390px]:hidden">Novo</span>
+      </Button>
+    </header>
   );
 }

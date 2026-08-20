@@ -1,4 +1,7 @@
-import { AdminSidebar } from "@/components/layout/admin-sidebar";
+import {
+  AdminMobileHeader,
+  AdminSidebar,
+} from "@/components/layout/admin-sidebar";
 import { requireSuperAdmin } from "@/lib/platform/admin";
 
 export default async function AdminLayout({
@@ -16,7 +19,10 @@ export default async function AdminLayout({
   return (
     <div className="flex min-h-screen bg-zinc-100 text-zinc-950">
       <AdminSidebar userName={userName} />
-      <main className="min-w-0 flex-1">{children}</main>
+      <div className="min-w-0 flex-1">
+        <AdminMobileHeader userName={userName} />
+        <main>{children}</main>
+      </div>
     </div>
   );
 }

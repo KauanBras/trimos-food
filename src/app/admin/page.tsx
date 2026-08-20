@@ -126,7 +126,7 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
         <Button
-          render={<Link href="/admin/restaurants#novo-restaurante" />}
+          render={<Link href="/admin/restaurants/new" />}
           nativeButton={false}
           className="gap-2"
         >
