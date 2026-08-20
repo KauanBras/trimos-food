@@ -18,9 +18,15 @@ function getRestaurantAudio() {
   }
 
   if (!restaurantAudio) {
-    // WAV is a lossless copy of the original OGG alert. It keeps the exact
-    // sound while avoiding the Opus/OGG rejection seen in some Safari builds.
-    restaurantAudio = new Audio("/sounds/new-order.wav");
+    restaurantAudio = new Audio();
+    const supportsOriginalOgg =
+      restaurantAudio.canPlayType('audio/ogg; codecs="opus"') !== "";
+
+    // O OGG é o alerta original. O WAV contém o mesmo áudio e é usado apenas
+    // quando o navegador não consegue reproduzir Opus (algumas versões do Safari).
+    restaurantAudio.src = supportsOriginalOgg
+      ? "/sounds/new-order.ogg"
+      : "/sounds/new-order.wav";
     restaurantAudio.preload = "auto";
     restaurantAudio.volume = RESTAURANT_ALARM_VOLUME;
     restaurantAudio.setAttribute("playsinline", "");
@@ -116,12 +122,6 @@ function playTone(
   oscillator.stop(endTime);
 }
 
-function playRestaurantFallback(trackForAlarm = false) {
-  playTone(440, 0.22, 0, 0.2, "sine", trackForAlarm);
-  playTone(554.37, 0.26, 0.25, 0.18, "sine", trackForAlarm);
-  playTone(659.25, 0.36, 0.54, 0.16, "sine", trackForAlarm);
-}
-
 function playDriverPattern(trackForAlarm = false) {
   playTone(660, 0.25, 0, 0.35, "sine", trackForAlarm);
   playTone(880, 0.25, 0.32, 0.35, "sine", trackForAlarm);
@@ -155,11 +155,10 @@ async function primeRestaurantAudio() {
   }
 }
 
-async function playRestaurantAudio(trackForAlarm = false) {
+async function playRestaurantAudio() {
   const audio = getRestaurantAudio();
 
   if (!audio || !restaurantFileReady) {
-    playRestaurantFallback(trackForAlarm);
     return;
   }
 
@@ -171,11 +170,8 @@ async function playRestaurantAudio(trackForAlarm = false) {
     restaurantAudioUnlocked = true;
   } catch (error) {
     restaurantFileReady = false;
-    playRestaurantFallback(trackForAlarm);
-    console.warn(
-      "O som original não pôde tocar; foi usado o alerta compatível.",
-      error,
-    );
+    restaurantAudioUnlocked = false;
+    console.warn("O som original do pedido não pôde tocar.", error);
   }
 }
 
@@ -190,8 +186,11 @@ async function performAudioUnlock() {
   ]);
 
   restaurantFileReady = fileReady;
-  restaurantAudioUnlocked = fileReady || context?.state === "running";
-  return restaurantAudioUnlocked;
+  restaurantAudioUnlocked = fileReady;
+
+  // O contexto continua preparado para os alertas dos estafetas, mas o som
+  // do restaurante só fica pronto quando o áudio original foi autorizado.
+  return fileReady || context?.state === "running";
 }
 
 export function unlockNotificationAudio() {
@@ -205,29 +204,11 @@ export function unlockNotificationAudio() {
 }
 
 export async function restoreNotificationAudio() {
-  if (
-    restaurantAudioUnlocked &&
-    (restaurantFileReady || audioContext?.state === "running")
-  ) {
-    return true;
-  }
-
-  try {
-    const context = await ensureAudioReady();
-    return (
-      restaurantAudioUnlocked &&
-      (restaurantFileReady || context.state === "running")
-    );
-  } catch {
-    return false;
-  }
+  return isNotificationAudioReady();
 }
 
 export function isNotificationAudioReady() {
-  return (
-    restaurantAudioUnlocked &&
-    (restaurantFileReady || audioContext?.state === "running")
-  );
+  return restaurantAudioUnlocked && restaurantFileReady;
 }
 
 export function startNotificationAlarm(type: AlarmType) {
@@ -237,7 +218,7 @@ export function startNotificationAlarm(type: AlarmType) {
         // The restaurant alert is a real audio file and does not depend on
         // Web Audio. Requiring AudioContext here caused Safari to suppress an
         // otherwise valid, already-authorised HTMLAudioElement.
-        await playRestaurantAudio(true);
+        await playRestaurantAudio();
       } else {
         await ensureAudioReady();
         playDriverPattern(true);

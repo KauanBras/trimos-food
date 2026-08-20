@@ -1,4 +1,4 @@
-import { Mail, Plus } from "lucide-react";
+import { Link2, ListPlus, Mail, Plus, Store } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +35,31 @@ export function CreateRestaurantForm({
         </div>
       </CardHeader>
       <CardContent className="p-5">
+        <div className="mb-5 grid gap-3 rounded-xl border border-amber-100 bg-white/70 p-4 text-sm text-zinc-600 md:grid-cols-3">
+          <div className="flex gap-3">
+            <Store className="mt-0.5 size-5 shrink-0 text-amber-600" />
+            <p>
+              <strong className="block text-zinc-900">1. Crie o espaço</strong>
+              O restaurante e o acesso do proprietário são criados aqui.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <ListPlus className="mt-0.5 size-5 shrink-0 text-amber-600" />
+            <p>
+              <strong className="block text-zinc-900">2. Cadastre o menu</strong>
+              Depois, entre nesse restaurante e abra Produtos para adicionar
+              categorias, pratos, preços, fotos e complementos.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Link2 className="mt-0.5 size-5 shrink-0 text-amber-600" />
+            <p>
+              <strong className="block text-zinc-900">3. Partilhe o link</strong>
+              Os produtos publicados aparecem automaticamente no menu dos clientes.
+            </p>
+          </div>
+        </div>
+
         <form action={createRestaurantFromAdminAction} className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <label className="space-y-1.5 text-sm">
@@ -47,12 +72,19 @@ export function CreateRestaurantForm({
               />
             </label>
             <label className="space-y-1.5 text-sm">
-              <span className="font-medium">Endereço do menu</span>
+              <span className="font-medium">Link público do menu (opcional)</span>
               <input
                 name="slug"
-                placeholder="Gerado automaticamente"
+                placeholder="casa-da-brasa"
                 className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 outline-none focus:border-amber-500"
               />
+              <span className="block text-xs leading-relaxed text-zinc-500">
+                Pode deixar vazio. Ex.: Casa da Brasa gera
+                <strong className="ml-1 text-zinc-700">
+                  trimos-food.vercel.app/r/casa-da-brasa
+                </strong>
+                .
+              </span>
             </label>
             <label className="space-y-1.5 text-sm">
               <span className="font-medium">Nome do proprietário</span>
