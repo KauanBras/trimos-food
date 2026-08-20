@@ -1,11 +1,33 @@
 type AlarmType = "restaurant" | "driver";
 
+const RESTAURANT_ALARM_INTERVAL_MS = 4500;
+const RESTAURANT_ALARM_VOLUME = 0.55;
+
 let audioContext: AudioContext | null = null;
+let restaurantAudio: HTMLAudioElement | null = null;
 let restaurantAudioUnlocked = false;
+let restaurantFileReady = false;
 let alarmInterval: ReturnType<typeof setInterval> | null = null;
 let currentAlarm: AlarmType | null = null;
 let unlockInFlight: Promise<boolean> | null = null;
 const activeAlarmOscillators = new Set<OscillatorNode>();
+
+function getRestaurantAudio() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  if (!restaurantAudio) {
+    // WAV is a lossless copy of the original OGG alert. It keeps the exact
+    // sound while avoiding the Opus/OGG rejection seen in some Safari builds.
+    restaurantAudio = new Audio("/sounds/new-order.wav");
+    restaurantAudio.preload = "auto";
+    restaurantAudio.volume = RESTAURANT_ALARM_VOLUME;
+    restaurantAudio.setAttribute("playsinline", "");
+  }
+
+  return restaurantAudio;
+}
 
 function getAudioContext() {
   if (typeof window === "undefined") {
@@ -24,7 +46,7 @@ function getAudioContext() {
     return null;
   }
 
-  if (!audioContext) {
+  if (!audioContext || audioContext.state === "closed") {
     audioContext = new AudioContextClass();
   }
 
@@ -36,10 +58,6 @@ async function ensureAudioReady() {
 
   if (!context) {
     throw new Error("O navegador não suporta notificações sonoras.");
-  }
-
-  if (context.state === "closed") {
-    throw new Error("O áudio do navegador foi encerrado.");
   }
 
   if (context.state !== "running") {
@@ -74,11 +92,9 @@ function playTone(
 
   oscillator.type = type;
   oscillator.frequency.setValueAtTime(frequency, startTime);
-
   gain.gain.setValueAtTime(0.0001, startTime);
   gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.02);
   gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
-
   oscillator.connect(gain);
   gain.connect(context.destination);
 
@@ -100,11 +116,10 @@ function playTone(
   oscillator.stop(endTime);
 }
 
-function playRestaurantPattern(trackForAlarm = false) {
-  // Campainha curta e suave, gerada pelo próprio navegador para funcionar
-  // de forma consistente no Safari, Chrome e telemóveis.
-  playTone(523.25, 0.32, 0, 0.18, "sine", trackForAlarm);
-  playTone(659.25, 0.48, 0.38, 0.16, "sine", trackForAlarm);
+function playRestaurantFallback(trackForAlarm = false) {
+  playTone(440, 0.22, 0, 0.2, "sine", trackForAlarm);
+  playTone(554.37, 0.26, 0.25, 0.18, "sine", trackForAlarm);
+  playTone(659.25, 0.36, 0.54, 0.16, "sine", trackForAlarm);
 }
 
 function playDriverPattern(trackForAlarm = false) {
@@ -113,16 +128,70 @@ function playDriverPattern(trackForAlarm = false) {
   playTone(1100, 0.35, 0.64, 0.35, "sine", trackForAlarm);
 }
 
-async function performAudioUnlock() {
-  // A chamada começa diretamente no gesto do utilizador. Isto é necessário
-  // para o Safari autorizar o AudioContext sem depender de um botão próprio.
-  const context = await ensureAudioReady();
-  if (context.state !== "running") {
-    throw new Error("O navegador manteve o áudio suspenso.");
+async function primeRestaurantAudio() {
+  const audio = getRestaurantAudio();
+
+  if (!audio) {
+    return false;
   }
-  restaurantAudioUnlocked = true;
-  playRestaurantPattern();
-  return true;
+
+  const previousVolume = audio.volume;
+  audio.pause();
+  audio.currentTime = 0;
+  audio.volume = 0;
+
+  try {
+    const playPromise = audio.play();
+    if (playPromise) {
+      await playPromise;
+    }
+    audio.pause();
+    audio.currentTime = 0;
+    audio.volume = previousVolume || RESTAURANT_ALARM_VOLUME;
+    return true;
+  } catch {
+    audio.volume = previousVolume || RESTAURANT_ALARM_VOLUME;
+    return false;
+  }
+}
+
+async function playRestaurantAudio(trackForAlarm = false) {
+  const audio = getRestaurantAudio();
+
+  if (!audio || !restaurantFileReady) {
+    playRestaurantFallback(trackForAlarm);
+    return;
+  }
+
+  try {
+    audio.pause();
+    audio.currentTime = 0;
+    audio.volume = RESTAURANT_ALARM_VOLUME;
+    await audio.play();
+    restaurantAudioUnlocked = true;
+  } catch (error) {
+    restaurantFileReady = false;
+    playRestaurantFallback(trackForAlarm);
+    console.warn(
+      "O som original não pôde tocar; foi usado o alerta compatível.",
+      error,
+    );
+  }
+}
+
+async function performAudioUnlock() {
+  // Estas duas chamadas precisam começar antes do primeiro await. Safari e
+  // iOS só autorizam áudio quando play/resume nascem diretamente do gesto.
+  const audioPrimePromise = primeRestaurantAudio();
+  const contextReadyPromise = ensureAudioReady().catch(() => null);
+  const [fileReady, context] = await Promise.all([
+    audioPrimePromise,
+    contextReadyPromise,
+  ]);
+
+  restaurantFileReady = fileReady;
+  restaurantAudioUnlocked = fileReady || context?.state === "running";
+  return restaurantAudioUnlocked;
 }
 
 export function unlockNotificationAudio() {
@@ -136,34 +205,42 @@ export function unlockNotificationAudio() {
 }
 
 export async function restoreNotificationAudio() {
-  if (restaurantAudioUnlocked) {
+  if (
+    restaurantAudioUnlocked &&
+    (restaurantFileReady || audioContext?.state === "running")
+  ) {
     return true;
   }
 
   try {
     const context = await ensureAudioReady();
-    restaurantAudioUnlocked = context.state === "running";
-    return restaurantAudioUnlocked;
+    return (
+      restaurantAudioUnlocked &&
+      (restaurantFileReady || context.state === "running")
+    );
   } catch {
     return false;
   }
 }
 
 export function isNotificationAudioReady() {
-  return restaurantAudioUnlocked && getAudioContext()?.state === "running";
+  return (
+    restaurantAudioUnlocked &&
+    (restaurantFileReady || audioContext?.state === "running")
+  );
 }
 
 export function startNotificationAlarm(type: AlarmType) {
-  const playPattern =
-    type === "restaurant" ? playRestaurantPattern : playDriverPattern;
-
   const playWhenReady = async () => {
     try {
-      await ensureAudioReady();
       if (type === "restaurant") {
-        playRestaurantPattern(true);
+        // The restaurant alert is a real audio file and does not depend on
+        // Web Audio. Requiring AudioContext here caused Safari to suppress an
+        // otherwise valid, already-authorised HTMLAudioElement.
+        await playRestaurantAudio(true);
       } else {
-        playPattern(true);
+        await ensureAudioReady();
+        playDriverPattern(true);
       }
     } catch (error) {
       console.warn("Não foi possível tocar o alarme:", error);
@@ -175,16 +252,14 @@ export function startNotificationAlarm(type: AlarmType) {
   }
 
   stopNotificationAlarm();
-
   currentAlarm = type;
-
   void playWhenReady();
 
   alarmInterval = setInterval(
     () => {
       void playWhenReady();
     },
-    type === "restaurant" ? 4500 : 2800,
+    type === "restaurant" ? RESTAURANT_ALARM_INTERVAL_MS : 2800,
   );
 }
 
@@ -195,6 +270,11 @@ export function stopNotificationAlarm() {
 
   alarmInterval = null;
   currentAlarm = null;
+
+  if (restaurantAudio) {
+    restaurantAudio.pause();
+    restaurantAudio.currentTime = 0;
+  }
 
   for (const oscillator of activeAlarmOscillators) {
     try {

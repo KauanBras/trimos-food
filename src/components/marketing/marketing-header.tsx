@@ -20,7 +20,7 @@ export function MarketingHeader() {
           <Link href="/pricing" className="hover:text-zinc-950">
             Preços
           </Link>
-          <Link href="/r/hirotatsu-sushi" className="hover:text-zinc-950">
+          <Link href="/r/hirotatsu-sushi-demo" className="hover:text-zinc-950">
             Demonstração
           </Link>
           <Link href="/contact" className="hover:text-zinc-950">

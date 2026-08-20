@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireSuperAdmin } from "@/lib/platform/admin";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe/server";
 import type { Database, Json } from "@/types/database";
 
@@ -56,6 +57,214 @@ async function recordAudit(
     requested_entity_id: entityId,
     requested_metadata: metadata,
   });
+}
+
+async function createUniqueRestaurantSlug(
+  admin: ReturnType<typeof createAdminClient>,
+  requestedSlug: string,
+) {
+  const baseSlug = createCode(requestedSlug);
+  if (!baseSlug) {
+    throw new Error("Indique um nome ou endereço válido para o restaurante.");
+  }
+
+  for (let suffix = 0; suffix < 100; suffix += 1) {
+    const candidate = suffix === 0 ? baseSlug : `${baseSlug}-${suffix + 1}`;
+    const { data, error } = await admin
+      .from("restaurants")
+      .select("id")
+      .eq("slug", candidate)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!data) return candidate;
+  }
+
+  throw new Error("Não foi possível gerar um endereço único.");
+}
+
+async function findAuthUserByEmail(
+  admin: ReturnType<typeof createAdminClient>,
+  email: string,
+) {
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
+    if (error) throw new Error(error.message);
+
+    const user = data.users.find(
+      (item) => item.email?.toLowerCase() === email.toLowerCase(),
+    );
+    if (user) return user;
+    if (data.users.length < 200) return null;
+  }
+
+  return null;
+}
+
+export async function createRestaurantFromAdminAction(formData: FormData) {
+  await requireSuperAdmin();
+
+  const name = requiredText(formData, "name");
+  const ownerEmail = requiredText(formData, "ownerEmail").toLowerCase();
+  const ownerName = optionalText(formData, "ownerName");
+  const requestedSlug = optionalText(formData, "slug") ?? name;
+  const planId = requiredText(formData, "planId");
+  const requestedStatus = requiredText(
+    formData,
+    "status",
+  ) as RestaurantStatus;
+  const isDemo = formData.get("isDemo") === "on";
+  const billingExempt = isDemo || formData.get("billingExempt") === "on";
+  const acceptsDelivery = formData.get("acceptsDelivery") === "on";
+  const acceptsPickup = formData.get("acceptsPickup") === "on";
+  const acceptsDineIn = formData.get("acceptsDineIn") === "on";
+  const acceptsReservations = formData.get("acceptsReservations") === "on";
+  const validStatuses: RestaurantStatus[] = [
+    "draft",
+    "active",
+    "suspended",
+    "inactive",
+  ];
+
+  if (!/^\S+@\S+\.\S+$/.test(ownerEmail)) {
+    throw new Error("Indique um e-mail válido para o proprietário.");
+  }
+  if (!validStatuses.includes(requestedStatus)) {
+    throw new Error("Estado inicial inválido.");
+  }
+  if (
+    !acceptsDelivery &&
+    !acceptsPickup &&
+    !acceptsDineIn &&
+    !acceptsReservations
+  ) {
+    throw new Error("Ative pelo menos um canal de atendimento.");
+  }
+
+  const admin = createAdminClient();
+  const [{ data: plan, error: planError }, slug] = await Promise.all([
+    admin
+      .from("subscription_plans")
+      .select("id")
+      .eq("id", planId)
+      .eq("is_active", true)
+      .maybeSingle(),
+    createUniqueRestaurantSlug(admin, requestedSlug),
+  ]);
+
+  if (planError || !plan) {
+    throw new Error(planError?.message ?? "O plano selecionado não está ativo.");
+  }
+
+  let owner = await findAuthUserByEmail(admin, ownerEmail);
+  let createdAuthUser = false;
+
+  if (!owner) {
+    const siteUrl = (
+      process.env.NEXT_PUBLIC_SITE_URL ?? "https://trimos-food.vercel.app"
+    ).replace(/\/$/, "");
+    const { data, error } = await admin.auth.admin.inviteUserByEmail(
+      ownerEmail,
+      {
+        data: {
+          full_name: ownerName ?? name,
+          account_type: "restaurant_owner",
+          restaurant_name: name,
+        },
+        redirectTo: `${siteUrl}/auth/callback`,
+      },
+    );
+
+    if (error || !data.user) {
+      throw new Error(
+        error?.message ?? "Não foi possível convidar o proprietário.",
+      );
+    }
+
+    owner = data.user;
+    createdAuthUser = true;
+  }
+
+  let restaurantId: string | null = null;
+
+  try {
+    const status: RestaurantStatus = isDemo ? "active" : requestedStatus;
+    const { data: restaurant, error: restaurantError } = await admin
+      .from("restaurants")
+      .insert({
+        name,
+        slug,
+        email: ownerEmail,
+        status,
+        is_demo: isDemo,
+        demo_locked: isDemo,
+        created_by: owner.id,
+        accepts_delivery: acceptsDelivery,
+        accepts_pickup: acceptsPickup,
+        accepts_dine_in: acceptsDineIn,
+        accepts_reservations: acceptsReservations,
+      })
+      .select("id")
+      .single();
+
+    if (restaurantError || !restaurant) {
+      throw new Error(
+        restaurantError?.message ?? "Não foi possível criar o restaurante.",
+      );
+    }
+    restaurantId = restaurant.id;
+
+    const { error: membershipError } = await admin
+      .from("restaurant_users")
+      .insert({
+        restaurant_id: restaurant.id,
+        user_id: owner.id,
+        role: "owner",
+        is_active: true,
+      });
+    if (membershipError) throw new Error(membershipError.message);
+
+    const { error: subscriptionError } = await admin
+      .from("restaurant_subscriptions")
+      .update({
+        plan_id: plan.id,
+        billing_exempt: billingExempt,
+        status: billingExempt ? "active" : "incomplete",
+      })
+      .eq("restaurant_id", restaurant.id);
+    if (subscriptionError) throw new Error(subscriptionError.message);
+
+    const { supabase } = await requireSuperAdmin();
+    await recordAudit(
+      supabase,
+      restaurant.id,
+      "restaurant.created",
+      "restaurant",
+      restaurant.id,
+      {
+        name,
+        slug,
+        ownerEmail,
+        planId,
+        isDemo,
+        billingExempt,
+      },
+    );
+  } catch (error) {
+    if (restaurantId) {
+      await admin.from("restaurants").delete().eq("id", restaurantId);
+    }
+    if (createdAuthUser) {
+      await admin.auth.admin.deleteUser(owner.id);
+    }
+    throw error;
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/restaurants");
 }
 
 export async function updateRestaurantCommercialAction(formData: FormData) {

@@ -15,7 +15,7 @@ import {
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getAuthDestination } from "@/lib/auth/get-auth-destination";
 import { formatMoneyFromCents } from "@/lib/platform/format";
@@ -100,15 +100,17 @@ export default async function HomePage() {
                 >
                   Pedir demonstração <ArrowRight className="size-4" />
                 </Button>
-                <Button
-                  render={<Link href="/r/hirotatsu-sushi" />}
-                  nativeButton={false}
-                  size="lg"
-                  variant="outline"
-                  className="h-11 border-white/15 bg-white/5 px-5 text-white hover:bg-white/10 hover:text-white"
+                <Link
+                  href="/r/hirotatsu-sushi-demo"
+                  className={buttonVariants({
+                    size: "lg",
+                    variant: "outline",
+                    className:
+                      "h-11 border-white/15 bg-white/5 px-5 text-white hover:bg-white/10 hover:text-white",
+                  })}
                 >
                   Ver exemplo real
-                </Button>
+                </Link>
               </div>
               <p className="mt-4 text-xs text-zinc-500">
                 Veja o sistema sem instalação. A configuração começa somente

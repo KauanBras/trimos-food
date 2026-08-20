@@ -126,11 +126,11 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
         <Button
-          render={<Link href="/admin/restaurants" />}
+          render={<Link href="/admin/restaurants#novo-restaurante" />}
           nativeButton={false}
           className="gap-2"
         >
-          Gerir restaurantes <ArrowRight className="size-4" />
+          Cadastrar restaurante <ArrowRight className="size-4" />
         </Button>
       </header>
 

@@ -58,6 +58,18 @@ test("vitrine comercial apresenta produto, preços e contacto", async ({
       .getByRole("banner")
       .getByRole("button", { name: "Pedir demonstração", exact: true }),
   ).toBeVisible();
+  const homeDemoLink = page.getByRole("link", {
+    name: "Ver exemplo real",
+  });
+  await expect(homeDemoLink).toHaveAttribute(
+    "href",
+    "/r/hirotatsu-sushi-demo",
+  );
+  const homeDemoResponse = await page.goto("/r/hirotatsu-sushi-demo");
+  expect(homeDemoResponse?.ok()).toBeTruthy();
+  await expect(page).toHaveURL(/\/r\/hirotatsu-sushi-demo$/, {
+    timeout: 15_000,
+  });
 
   await page.goto("/pricing");
   await expect(
@@ -69,6 +81,18 @@ test("vitrine comercial apresenta produto, preços e contacto", async ({
   await expect(
     page.getByText(/de configuração inicial/).first(),
   ).toBeVisible();
+  const pricingDemoLink = page
+    .getByRole("link", { name: "Ver demonstração", exact: true })
+    .first();
+  await expect(pricingDemoLink).toHaveAttribute(
+    "href",
+    "/r/hirotatsu-sushi-demo",
+  );
+  const pricingDemoResponse = await page.goto("/r/hirotatsu-sushi-demo");
+  expect(pricingDemoResponse?.ok()).toBeTruthy();
+  await expect(page).toHaveURL(/\/r\/hirotatsu-sushi-demo$/, {
+    timeout: 15_000,
+  });
 
   await page.goto("/contact");
   await expect(

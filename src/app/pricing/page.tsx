@@ -3,7 +3,7 @@ import { Check, Eye, Settings2, ShieldCheck } from "lucide-react";
 import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatMoneyFromCents } from "@/lib/platform/format";
 import { createClient } from "@/lib/supabase/server";
@@ -90,25 +90,30 @@ export default async function PricingPage() {
                       </li>
                     ))}
                   </ul>
-                  <Button
-                    render={
-                      <Link
-                        href={
-                          index === 0
-                            ? "/r/hirotatsu-sushi"
-                            : `/contact?plan=${encodeURIComponent(plan.code)}`
-                        }
-                      />
-                    }
-                    nativeButton={false}
-                    className="mt-8 w-full"
-                  >
-                    {index === 0
-                      ? "Ver demonstração"
-                      : index === 1
+                  {index === 0 ? (
+                    <Link
+                      href="/r/hirotatsu-sushi-demo"
+                      className={buttonVariants({
+                        className: "mt-8 w-full",
+                      })}
+                    >
+                      Ver demonstração
+                    </Link>
+                  ) : (
+                    <Button
+                      render={
+                        <Link
+                          href={`/contact?plan=${encodeURIComponent(plan.code)}`}
+                        />
+                      }
+                      nativeButton={false}
+                      className="mt-8 w-full"
+                    >
+                      {index === 1
                         ? "Solicitar configuração"
                         : "Falar com especialista"}
-                  </Button>
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );

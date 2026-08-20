@@ -39,6 +39,8 @@ export function RestaurantAudioProvider({
       return;
     }
 
+    audioUnlockedRef.current = isNotificationAudioReady();
+
     if (!audioUnlockedRef.current) {
       return;
     }
@@ -121,31 +123,27 @@ export function RestaurantAudioProvider({
   }, []);
 
   useEffect(() => {
-    if (!enabled || audioUnlockedRef.current) return;
-
+    if (!enabled) return;
     let activating = false;
 
-    const removeActivationListeners = () => {
-      window.removeEventListener("pointerdown", activateFromGesture, true);
-      window.removeEventListener("touchend", activateFromGesture, true);
-      window.removeEventListener("keydown", activateFromGesture, true);
-    };
-
     const activateFromGesture = () => {
-      if (activating || audioUnlockedRef.current) return;
+      if (activating || isNotificationAudioReady()) return;
       activating = true;
 
-      void unlockAudio(true).then((ready) => {
+      void unlockAudio(true).then(() => {
         activating = false;
-        if (ready) removeActivationListeners();
       });
     };
 
     window.addEventListener("pointerdown", activateFromGesture, true);
-    window.addEventListener("touchend", activateFromGesture, true);
+    window.addEventListener("touchstart", activateFromGesture, true);
     window.addEventListener("keydown", activateFromGesture, true);
 
-    return removeActivationListeners;
+    return () => {
+      window.removeEventListener("pointerdown", activateFromGesture, true);
+      window.removeEventListener("touchstart", activateFromGesture, true);
+      window.removeEventListener("keydown", activateFromGesture, true);
+    };
   }, [enabled, unlockAudio]);
 
   useEffect(() => {
@@ -153,16 +151,10 @@ export function RestaurantAudioProvider({
       return;
     }
 
-    const audioWasEnabled =
-      window.localStorage.getItem(AUDIO_PREFERENCE_KEY) === "true" ||
-      window.sessionStorage.getItem(AUDIO_PREFERENCE_KEY) === "true";
-
-    const restoreTimer = audioWasEnabled
-      ? window.setTimeout(() => void restoreAudio(), 0)
-      : null;
+    const restoreTimer = window.setTimeout(() => void restoreAudio(), 0);
 
     return () => {
-      if (restoreTimer !== null) window.clearTimeout(restoreTimer);
+      window.clearTimeout(restoreTimer);
     };
   }, [enabled, restoreAudio]);
 
