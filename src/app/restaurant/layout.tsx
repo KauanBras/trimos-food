@@ -9,14 +9,8 @@ export default async function RestaurantLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const {
-    supabase,
-    user,
-    role,
-    restaurantId,
-    restaurant,
-    membershipCount,
-  } = await getCurrentRestaurant();
+  const { supabase, user, role, restaurantId, restaurant, membershipCount } =
+    await getCurrentRestaurant();
   const [
     { data: profile },
     { data: settings },

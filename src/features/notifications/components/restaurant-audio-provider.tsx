@@ -1,265 +1,334 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef } from "react";
 
 import {
+  primeRestaurantAudio,
   startNotificationAlarm,
   stopNotificationAlarm,
-  unlockNotificationAudio,
-  isNotificationAudioReady,
-  restoreNotificationAudio,
 } from "@/lib/audio/notification-alarm";
 import { createClient } from "@/lib/supabase/client";
 
 type RestaurantAudioProviderProps = {
   restaurantId: string;
   initialNewOrders: number;
-  enabled?: boolean;
+  enabled: boolean;
 };
 
-const AUDIO_PREFERENCE_KEY = "trimos-restaurant-audio-unlocked";
+const AUDIO_PERMISSION_KEY = "trimos-restaurant-audio-permission";
 
 export function RestaurantAudioProvider({
   restaurantId,
   initialNewOrders,
-  enabled = true,
+  enabled,
 }: RestaurantAudioProviderProps) {
-  const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
+  const pendingOrderIdsRef = useRef<Set<string>>(new Set());
+  const activatingRef = useRef(false);
+  const enabledRef = useRef(enabled);
 
-  const audioUnlockedRef = useRef(false);
-  const newOrdersCountRef = useRef(initialNewOrders);
+  enabledRef.current = enabled;
 
-  const syncAlarm = useCallback((count: number) => {
-    newOrdersCountRef.current = count;
-
-    if (!enabled || count <= 0) {
+  const syncAlarm = useCallback(() => {
+    if (!enabledRef.current) {
       stopNotificationAlarm();
       return;
     }
 
-    audioUnlockedRef.current = isNotificationAudioReady();
-
-    if (!audioUnlockedRef.current) {
-      return;
-    }
-
-    startNotificationAlarm("restaurant");
-  }, [enabled]);
-
-  const fetchNewOrdersCount = useCallback(async () => {
-    if (!enabled) {
-      stopNotificationAlarm();
-      return;
-    }
-
-    const { count, error } = await supabase
-      .from("orders")
-      .select("id", {
-        count: "exact",
-        head: true,
-      })
-      .eq("restaurant_id", restaurantId)
-      .eq("status", "new");
-
-    if (error) {
-      console.error(
-        "Não foi possível consultar os novos pedidos:",
-        error.message,
-      );
-      return;
-    }
-
-    syncAlarm(count ?? 0);
-  }, [enabled, restaurantId, supabase, syncAlarm]);
-
-  const unlockAudio = useCallback(async (requestNotifications = true) => {
-    try {
-      const ready = await unlockNotificationAudio();
-      if (!ready) throw new Error("O navegador manteve o áudio suspenso.");
-
-      audioUnlockedRef.current = true;
-
-      window.localStorage.setItem(AUDIO_PREFERENCE_KEY, "true");
-      window.sessionStorage.setItem(AUDIO_PREFERENCE_KEY, "true");
-
-      if (
-        requestNotifications &&
-        "Notification" in window &&
-        Notification.permission === "default"
-      ) {
-        try {
-          await Notification.requestPermission();
-        } catch (notificationError) {
-          console.warn("Não foi possível pedir permissão de notificações:", notificationError);
-        }
-      }
-
-      if (newOrdersCountRef.current > 0) {
-        startNotificationAlarm("restaurant");
-      }
-      return true;
-    } catch (error) {
-      console.warn("Não foi possível desbloquear o áudio:", error);
-      return false;
-    }
-  }, []);
-
-  const restoreAudio = useCallback(async () => {
-    const ready = await restoreNotificationAudio();
-
-    if (!ready) {
-      return false;
-    }
-
-    audioUnlockedRef.current = true;
-
-    if (newOrdersCountRef.current > 0) {
+    if (pendingOrderIdsRef.current.size > 0) {
       startNotificationAlarm("restaurant");
+      return;
     }
 
-    return true;
+    stopNotificationAlarm();
   }, []);
+
+  const replacePendingOrders = useCallback(
+    (orderIds: string[]) => {
+      pendingOrderIdsRef.current = new Set(orderIds);
+      syncAlarm();
+    },
+    [syncAlarm],
+  );
+
+  const updatePendingOrder = useCallback(
+    (orderId: string, isPending: boolean) => {
+      if (isPending) {
+        pendingOrderIdsRef.current.add(orderId);
+      } else {
+        pendingOrderIdsRef.current.delete(orderId);
+      }
+
+      syncAlarm();
+    },
+    [syncAlarm],
+  );
+
+  const activateAudio = useCallback(async () => {
+    if (!enabledRef.current || activatingRef.current) return;
+
+    activatingRef.current = true;
+
+    try {
+      /*
+       * IMPORTANTE:
+       * primeRestaurantAudio() precisa de ser chamado a partir de uma
+       * interação real do utilizador em browsers que aplicam autoplay policy.
+       */
+      const activated = await primeRestaurantAudio();
+
+      if (!activated) return;
+
+      try {
+        window.localStorage.setItem(AUDIO_PERMISSION_KEY, "true");
+      } catch {
+        // O áudio continua a funcionar mesmo sem localStorage.
+      }
+
+      syncAlarm();
+    } finally {
+      activatingRef.current = false;
+    }
+  }, [syncAlarm]);
+
+  useEffect(() => {
+    if (!enabled) {
+      pendingOrderIdsRef.current.clear();
+      stopNotificationAlarm();
+      return;
+    }
+
+    syncAlarm();
+  }, [enabled, syncAlarm]);
 
   useEffect(() => {
     if (!enabled) return;
-    let activating = false;
 
-    const activateFromGesture = () => {
-      if (activating || isNotificationAudioReady()) return;
-      activating = true;
+    /*
+     * Se o utilizador já desbloqueou o áudio anteriormente,
+     * tentamos restaurá-lo automaticamente.
+     *
+     * Chromium pode permitir esta reprodução dependendo das políticas
+     * de autoplay / media engagement. Safari pode continuar a exigir
+     * uma interação depois de um reload completo.
+     */
+    try {
+      const wasPreviouslyActivated =
+        window.localStorage.getItem(AUDIO_PERMISSION_KEY) === "true";
 
-      void unlockAudio(true).then(() => {
-        activating = false;
-      });
-    };
-
-    window.addEventListener("pointerdown", activateFromGesture, true);
-    window.addEventListener("touchstart", activateFromGesture, true);
-    window.addEventListener("keydown", activateFromGesture, true);
-
-    return () => {
-      window.removeEventListener("pointerdown", activateFromGesture, true);
-      window.removeEventListener("touchstart", activateFromGesture, true);
-      window.removeEventListener("keydown", activateFromGesture, true);
-    };
-  }, [enabled, unlockAudio]);
-
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    const restoreTimer = window.setTimeout(() => void restoreAudio(), 0);
-
-    return () => {
-      window.clearTimeout(restoreTimer);
-    };
-  }, [enabled, restoreAudio]);
-
-  useEffect(() => {
-    if (!enabled) {
-      stopNotificationAlarm();
-      return;
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        if (!isNotificationAudioReady()) void restoreAudio();
-        void fetchNewOrdersCount();
+      if (wasPreviouslyActivated) {
+        void primeRestaurantAudio().then((activated: boolean) => {
+          if (activated) {
+            syncAlarm();
+          }
+        });
       }
-    };
-
-    const handleFocus = () => {
-      if (!isNotificationAudioReady()) void restoreAudio();
-      void fetchNewOrdersCount();
-    };
-
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [enabled, fetchNewOrdersCount, restoreAudio]);
+    } catch {
+      // Ignora browsers/modos onde localStorage não está disponível.
+    }
+  }, [enabled, syncAlarm]);
 
   useEffect(() => {
-    if (!enabled) {
-      stopNotificationAlarm();
-      return;
-    }
+    if (!enabled) return;
 
-    void fetchNewOrdersCount();
+    const supabase = createClient();
 
-    const pollingId = window.setInterval(() => {
-      void fetchNewOrdersCount();
-    }, 4000);
+    let disposed = false;
+
+    const fetchPendingOrders = async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("restaurant_id", restaurantId)
+        .eq("status", "new");
+
+      if (disposed) return;
+
+      if (error) {
+        console.warn(
+          "Não foi possível atualizar os pedidos pendentes.",
+          error,
+        );
+        return;
+      }
+
+      replacePendingOrders(
+        (data ?? []).map(({ id }) => String(id)),
+      );
+    };
+
+    /*
+     * Se o servidor informou que já existem pedidos novos,
+     * fazemos imediatamente a leitura completa.
+     *
+     * Mesmo quando initialNewOrders é zero fazemos a sincronização,
+     * porque um pedido pode ter chegado entre o render do servidor e
+     * a montagem deste componente.
+     */
+    void fetchPendingOrders();
 
     const channel = supabase
-      .channel(`restaurant-global-audio-${restaurantId}`)
+      .channel(`restaurant-orders-audio-${restaurantId}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "orders",
           filter: `restaurant_id=eq.${restaurantId}`,
         },
         (payload) => {
-          if (payload.new.status !== "new") return;
-          if ("Notification" in window && Notification.permission === "granted") {
-            const orderId = String(payload.new.id ?? "novo");
-            const notification = new Notification("Novo pedido recebido", {
-              body: "Abra o painel para aceitar ou recusar o pedido.",
-              tag: `trimos-order-${orderId}`,
-            });
-            notification.onclick = () => {
-              window.focus();
-              router.push("/restaurant/orders");
-              notification.close();
-            };
+          const newOrder = payload.new as {
+            id?: string;
+            status?: string;
+          };
+
+          const oldOrder = payload.old as {
+            id?: string;
+            status?: string;
+          };
+
+          const orderId = String(
+            newOrder.id ?? oldOrder.id ?? "",
+          );
+
+          if (orderId) {
+            updatePendingOrder(
+              orderId,
+              newOrder.status === "new",
+            );
           }
-          void fetchNewOrdersCount();
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "orders",
-          filter: `restaurant_id=eq.${restaurantId}`,
-        },
-        () => {
-          void fetchNewOrdersCount();
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "orders",
-          filter: `restaurant_id=eq.${restaurantId}`,
-        },
-        () => {
-          void fetchNewOrdersCount();
+
+          if (
+            payload.eventType === "INSERT" &&
+            newOrder.status === "new" &&
+            "Notification" in window &&
+            Notification.permission === "granted"
+          ) {
+            new Notification("Novo pedido", {
+              body: "Há um novo pedido à espera de aceitação.",
+              tag: `restaurant-order-${orderId}`,
+            });
+          }
+
+          /*
+           * Fazemos também uma confirmação no banco.
+           * Assim o som não depende exclusivamente do Realtime.
+           */
+          void fetchPendingOrders();
         },
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          void fetchNewOrdersCount();
+          void fetchPendingOrders();
         }
       });
 
-    return () => {
-      window.clearInterval(pollingId);
-      stopNotificationAlarm();
-      void supabase.removeChannel(channel);
+    /*
+     * Polling de segurança.
+     *
+     * Mesmo se o WebSocket cair silenciosamente, no máximo alguns
+     * segundos depois o restaurante vê/toca o novo pedido.
+     */
+    const poll = window.setInterval(() => {
+      void fetchPendingOrders();
+    }, 3000);
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void fetchPendingOrders();
+      }
     };
-  }, [enabled, fetchNewOrdersCount, restaurantId, router, supabase]);
+
+    const refreshWhenOnline = () => {
+      void fetchPendingOrders();
+    };
+
+    document.addEventListener(
+      "visibilitychange",
+      refreshWhenVisible,
+    );
+
+    window.addEventListener(
+      "focus",
+      refreshWhenVisible,
+    );
+
+    window.addEventListener(
+      "online",
+      refreshWhenOnline,
+    );
+
+    return () => {
+      disposed = true;
+
+      window.clearInterval(poll);
+
+      document.removeEventListener(
+        "visibilitychange",
+        refreshWhenVisible,
+      );
+
+      window.removeEventListener(
+        "focus",
+        refreshWhenVisible,
+      );
+
+      window.removeEventListener(
+        "online",
+        refreshWhenOnline,
+      );
+
+      void supabase.removeChannel(channel);
+
+      stopNotificationAlarm();
+    };
+  }, [
+    enabled,
+    initialNewOrders,
+    replacePendingOrders,
+    restaurantId,
+    updatePendingOrder,
+  ]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    /*
+     * Primeira interação no painel desbloqueia o áudio.
+     *
+     * Não precisamos de botão "Ativar som". Qualquer clique/toque/tecla
+     * utilizado normalmente no dashboard serve para desbloquear.
+     */
+    const unlock = () => {
+      void activateAudio();
+    };
+
+    window.addEventListener(
+      "pointerdown",
+      unlock,
+      { capture: true },
+    );
+
+    window.addEventListener(
+      "keydown",
+      unlock,
+      { capture: true },
+    );
+
+    return () => {
+      window.removeEventListener(
+        "pointerdown",
+        unlock,
+        { capture: true },
+      );
+
+      window.removeEventListener(
+        "keydown",
+        unlock,
+        { capture: true },
+      );
+    };
+  }, [activateAudio, enabled]);
 
   return null;
 }

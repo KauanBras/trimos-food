@@ -15,7 +15,7 @@ const contentSecurityPolicy = `
   base-uri 'self';
   form-action 'self' https://checkout.stripe.com https://connect.stripe.com;
   frame-ancestors 'none';
-  upgrade-insecure-requests;
+  ${isDevelopment ? "" : "upgrade-insecure-requests;"}
 `.replace(/\s{2,}/g, " ").trim();
 
 const nextConfig: NextConfig = {
