@@ -11,10 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  configureRestaurantFromAdminAction,
   resetDemoRestaurantAction,
   updateRestaurantCommercialAction,
 } from "@/features/platform/actions/platform-actions";
 import { CreateRestaurantForm } from "@/features/platform/components/create-restaurant-form";
+import { DeliverRestaurantOwnerForm } from "@/features/platform/components/deliver-restaurant-owner-form";
 import { requireSuperAdmin } from "@/lib/platform/admin";
 import { formatDateTime } from "@/lib/platform/format";
 
@@ -29,7 +31,7 @@ export default async function AdminRestaurantsPage() {
     supabase
       .from("restaurants")
       .select(
-        "id, name, slug, status, is_demo, demo_locked, demo_last_reset_at, created_at",
+        "id, name, slug, email, status, is_demo, demo_locked, demo_last_reset_at, created_at",
       )
       .order("created_at", { ascending: false }),
     supabase.from("restaurant_subscriptions").select("*"),
@@ -114,7 +116,7 @@ export default async function AdminRestaurantsPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      {restaurant.is_demo ? (
+                     {restaurant.is_demo ? (
                         <Badge className="bg-violet-100 text-violet-700">
                           Demo
                         </Badge>
@@ -145,6 +147,31 @@ export default async function AdminRestaurantsPage() {
                         {formatDateTime(restaurant.created_at).split(",")[0]}
                       </p>
                     </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <form action={configureRestaurantFromAdminAction}>
+                      <input
+                        type="hidden"
+                        name="restaurantId"
+                        value={restaurant.id}
+                      />
+
+                      <Button
+                        type="submit"
+                        variant="outline"
+                        className="w-full gap-2 border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                      >
+                        <Store className="size-4" />
+                        Configurar restaurante
+                      </Button>
+                    </form>
+
+                    <DeliverRestaurantOwnerForm
+                      restaurantId={restaurant.id}
+                      restaurantName={restaurant.name}
+                      currentEmail={restaurant.email}
+                    />
                   </div>
 
                   <form

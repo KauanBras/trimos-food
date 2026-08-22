@@ -1,8 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { requireSuperAdmin } from "@/lib/platform/admin";
+import { CURRENT_RESTAURANT_COOKIE } from "@/lib/restaurants/get-current-restaurant";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe/server";
 import type { Database, Json } from "@/types/database";
@@ -537,4 +540,478 @@ export async function syncSubscriptionPlanWithStripeAction(formData: FormData) {
 
   revalidatePath("/admin/plans");
   revalidatePath("/restaurant/billing");
+}
+
+export type CreateRestaurantAdminResult = {
+  ok: boolean;
+  message: string;
+};
+
+export async function createRestaurantFromAdminSafeAction(
+  formData: FormData,
+): Promise<CreateRestaurantAdminResult> {
+  try {
+    await createRestaurantFromAdminAction(formData);
+
+    return {
+      ok: true,
+      message: "Restaurante criado e convite enviado com sucesso.",
+    };
+  } catch (error) {
+    console.error("Erro ao criar restaurante pelo administrador:", error);
+
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Não foi possível criar o restaurante.",
+    };
+  }
+}
+
+export type CreateInternalRestaurantResult = {
+  ok: boolean;
+  message: string;
+  restaurantId?: string;
+};
+
+export async function createInternalRestaurantAction(
+  formData: FormData,
+): Promise<CreateInternalRestaurantResult> {
+  try {
+    const { user } = await requireSuperAdmin();
+
+    const name = requiredText(formData, "name");
+    const requestedSlug = optionalText(formData, "slug") ?? name;
+    const planId = requiredText(formData, "planId");
+
+    const acceptsDelivery =
+      formData.get("acceptsDelivery") === "on";
+
+    const acceptsPickup =
+      formData.get("acceptsPickup") === "on";
+
+    const acceptsDineIn =
+      formData.get("acceptsDineIn") === "on";
+
+    const acceptsReservations =
+      formData.get("acceptsReservations") === "on";
+
+    if (
+      !acceptsDelivery &&
+      !acceptsPickup &&
+      !acceptsDineIn &&
+      !acceptsReservations
+    ) {
+      return {
+        ok: false,
+        message: "Ative pelo menos um canal de atendimento.",
+      };
+    }
+
+    const admin = createAdminClient();
+
+    const [{ data: plan, error: planError }, slug] =
+      await Promise.all([
+        admin
+          .from("subscription_plans")
+          .select("id")
+          .eq("id", planId)
+          .eq("is_active", true)
+          .maybeSingle(),
+
+        createUniqueRestaurantSlug(
+          admin,
+          requestedSlug,
+        ),
+      ]);
+
+    if (planError || !plan) {
+      return {
+        ok: false,
+        message:
+          planError?.message ??
+          "O plano selecionado não está ativo.",
+      };
+    }
+
+    let restaurantId: string | null = null;
+
+    try {
+      const {
+        data: restaurant,
+        error: restaurantError,
+      } = await admin
+        .from("restaurants")
+        .insert({
+          name,
+          slug,
+          status: "draft",
+          created_by: user.id,
+          accepts_delivery: acceptsDelivery,
+          accepts_pickup: acceptsPickup,
+          accepts_dine_in: acceptsDineIn,
+          accepts_reservations: acceptsReservations,
+        })
+        .select("id")
+        .single();
+
+      if (restaurantError || !restaurant) {
+        throw new Error(
+          restaurantError?.message ??
+            "Não foi possível criar o restaurante.",
+        );
+      }
+
+      restaurantId = restaurant.id;
+
+      const { error: membershipError } =
+        await admin
+          .from("restaurant_users")
+          .upsert(
+            {
+              restaurant_id: restaurant.id,
+              user_id: user.id,
+              role: "admin",
+              is_active: true,
+            },
+            {
+              onConflict:
+                "restaurant_id,user_id",
+            },
+          );
+
+      if (membershipError) {
+        throw new Error(
+          membershipError.message,
+        );
+      }
+
+      const { error: subscriptionError } =
+        await admin
+          .from("restaurant_subscriptions")
+          .update({
+            plan_id: plan.id,
+            status: "incomplete",
+            billing_exempt: true,
+          })
+          .eq(
+            "restaurant_id",
+            restaurant.id,
+          );
+
+      if (subscriptionError) {
+        throw new Error(
+          subscriptionError.message,
+        );
+      }
+
+      const { supabase } =
+        await requireSuperAdmin();
+
+      await recordAudit(
+        supabase,
+        restaurant.id,
+        "restaurant.created_internal",
+        "restaurant",
+        restaurant.id,
+        {
+          name,
+          slug,
+          planId,
+          createdForConfiguration: true,
+        },
+      );
+
+      revalidatePath("/admin");
+      revalidatePath("/admin/restaurants");
+
+      return {
+        ok: true,
+        message:
+          "Restaurante criado. Agora pode configurar o ambiente.",
+        restaurantId: restaurant.id,
+      };
+    } catch (error) {
+      if (restaurantId) {
+        await admin
+          .from("restaurants")
+          .delete()
+          .eq("id", restaurantId);
+      }
+
+      throw error;
+    }
+  } catch (error) {
+    console.error(
+      "Erro ao criar restaurante interno:",
+      error,
+    );
+
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Não foi possível criar o restaurante.",
+    };
+  }
+}
+
+
+export async function configureRestaurantFromAdminAction(
+  formData: FormData,
+) {
+  const restaurantId = requiredText(
+    formData,
+    "restaurantId",
+  );
+
+  const { user } = await requireSuperAdmin();
+  const admin = createAdminClient();
+
+  const {
+    data: restaurant,
+    error: restaurantError,
+  } = await admin
+    .from("restaurants")
+    .select("id")
+    .eq("id", restaurantId)
+    .maybeSingle();
+
+  if (restaurantError || !restaurant) {
+    throw new Error(
+      restaurantError?.message ??
+        "Restaurante não encontrado.",
+    );
+  }
+
+  const { error: membershipError } = await admin
+    .from("restaurant_users")
+    .upsert(
+      {
+        restaurant_id: restaurantId,
+        user_id: user.id,
+        role: "admin",
+        is_active: true,
+      },
+      {
+        onConflict: "restaurant_id,user_id",
+      },
+    );
+
+  if (membershipError) {
+    throw new Error(
+      `Não foi possível abrir o restaurante: ${membershipError.message}`,
+    );
+  }
+
+  const cookieStore = await cookies();
+
+  cookieStore.set(
+    CURRENT_RESTAURANT_COOKIE,
+    restaurantId,
+    {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    },
+  );
+
+  redirect("/restaurant/dashboard");
+}
+
+export type DeliverRestaurantResult = {
+  ok: boolean;
+  message: string;
+  invited?: boolean;
+};
+
+export async function deliverRestaurantToOwnerAction(
+  formData: FormData,
+): Promise<DeliverRestaurantResult> {
+  try {
+    const restaurantId = requiredText(formData, "restaurantId");
+    const ownerEmail = requiredText(formData, "ownerEmail").toLowerCase();
+    const ownerName = optionalText(formData, "ownerName");
+
+    await requireSuperAdmin();
+
+    if (!/^\S+@\S+\.\S+$/.test(ownerEmail)) {
+      return {
+        ok: false,
+        message: "Indique um e-mail válido para o proprietário.",
+      };
+    }
+
+    const admin = createAdminClient();
+
+    const {
+      data: restaurant,
+      error: restaurantError,
+    } = await admin
+      .from("restaurants")
+      .select("id, name, slug")
+      .eq("id", restaurantId)
+      .maybeSingle();
+
+    if (restaurantError || !restaurant) {
+      return {
+        ok: false,
+        message:
+          restaurantError?.message ??
+          "Restaurante não encontrado.",
+      };
+    }
+
+    let owner = await findAuthUserByEmail(
+      admin,
+      ownerEmail,
+    );
+
+    let invited = false;
+
+    if (!owner) {
+      const siteUrl = (
+        process.env.NEXT_PUBLIC_SITE_URL ??
+        "https://trimos-food.vercel.app"
+      ).replace(/\/$/, "");
+
+      const { data, error } =
+        await admin.auth.admin.inviteUserByEmail(
+          ownerEmail,
+          {
+            data: {
+              full_name:
+                ownerName ?? restaurant.name,
+              account_type:
+                "restaurant_owner",
+              restaurant_name:
+                restaurant.name,
+            },
+            redirectTo:
+              `${siteUrl}/owner/activate`,
+          },
+        );
+
+      if (error || !data.user) {
+        return {
+          ok: false,
+          message:
+            error?.message ??
+            "Não foi possível enviar o convite.",
+        };
+      }
+
+      owner = data.user;
+      invited = true;
+    }
+
+    if (!owner) {
+      return {
+        ok: false,
+        message:
+          "Não foi possível identificar o proprietário.",
+      };
+    }
+
+    if (ownerName) {
+      const { error: profileError } = await admin
+        .from("profiles")
+        .update({
+          full_name: ownerName,
+        })
+        .eq("id", owner.id);
+
+      if (profileError) {
+        return {
+          ok: false,
+          message: profileError.message,
+        };
+      }
+    }
+
+    const { error: membershipError } =
+      await admin
+        .from("restaurant_users")
+        .upsert(
+          {
+            restaurant_id: restaurantId,
+            user_id: owner.id,
+            role: "owner",
+            is_active: true,
+          },
+          {
+            onConflict:
+              "restaurant_id,user_id",
+          },
+        );
+
+    if (membershipError) {
+      return {
+        ok: false,
+        message: membershipError.message,
+      };
+    }
+
+    const { error: restaurantUpdateError } =
+      await admin
+        .from("restaurants")
+        .update({
+          email: ownerEmail,
+          status: "active",
+        })
+        .eq("id", restaurantId);
+
+    if (restaurantUpdateError) {
+      return {
+        ok: false,
+        message:
+          restaurantUpdateError.message,
+      };
+    }
+
+    const { supabase } =
+      await requireSuperAdmin();
+
+    await recordAudit(
+      supabase,
+      restaurantId,
+      "restaurant.delivered_to_owner",
+      "restaurant",
+      restaurantId,
+      {
+        ownerEmail,
+        ownerName,
+        invited,
+      },
+    );
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/restaurants");
+
+    return {
+      ok: true,
+      invited,
+      message: invited
+        ? "Restaurante entregue e convite enviado ao proprietário."
+        : "Proprietário associado ao restaurante com sucesso.",
+    };
+  } catch (error) {
+    console.error(
+      "Erro ao entregar restaurante ao proprietário:",
+      error,
+    );
+
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Não foi possível entregar o restaurante.",
+    };
+  }
 }
